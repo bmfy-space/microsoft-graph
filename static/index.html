@@ -85,6 +85,12 @@
   .modal-body textarea::placeholder { color: #aaa; }
   .modal-body .hint { font-size: 12px; color: #999; margin-top: 8px; }
   .modal-footer { padding: 12px 20px; border-top: 1px solid #e0e0e0; display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* Export dropdown */
+  .export-menu { position: absolute; right: 0; top: 32px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; min-width: 160px; overflow: hidden; }
+  .export-menu.hidden { display: none; }
+  .export-menu-item { padding: 9px 14px; font-size: 12px; cursor: pointer; transition: background .1s; }
+  .export-menu-item:hover { background: #f0f4fa; }
 </style>
 </head>
 <body>
@@ -94,7 +100,14 @@
   <div class="panel panel-accounts">
     <div class="panel-header">
       <span>Accounts <span class="account-count" id="accountCount"></span></span>
-      <button class="btn-icon" onclick="openImportModal()" title="Import">+</button>
+      <div style="display:flex;gap:4px;position:relative">
+        <button class="btn btn-sm btn-ghost" onclick="openImportModal()">Import</button>
+        <button class="btn btn-sm btn-ghost" onclick="toggleExportMenu(event)">Export</button>
+        <div class="export-menu hidden" id="exportMenu">
+          <div class="export-menu-item" onclick="exportCopy()">Copy to clipboard</div>
+          <div class="export-menu-item" onclick="exportDownload()">Download .txt</div>
+        </div>
+      </div>
     </div>
     <div class="panel-body" id="accountList">
       <div class="empty">No accounts</div>
@@ -242,8 +255,53 @@ document.getElementById('importModal').addEventListener('click', function(e) {
 });
 
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeImportModal();
+  if (e.key === 'Escape') { closeImportModal(); closeExportMenu(); }
 });
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.export-menu') && !e.target.closest('[onclick*="toggleExportMenu"]')) closeExportMenu();
+});
+
+// ── Export ──
+
+function getExportText() {
+  return accounts.map(a => a.raw).join('\n');
+}
+
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  document.getElementById('exportMenu').classList.toggle('hidden');
+}
+
+function closeExportMenu() {
+  document.getElementById('exportMenu').classList.add('hidden');
+}
+
+async function exportCopy() {
+  closeExportMenu();
+  if (!accounts.length) return;
+  try {
+    await navigator.clipboard.writeText(getExportText());
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = getExportText();
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+function exportDownload() {
+  closeExportMenu();
+  if (!accounts.length) return;
+  const blob = new Blob([getExportText()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'accounts.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ── Accounts ──
 
