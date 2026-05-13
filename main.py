@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -23,8 +23,8 @@ EMAIL_FIELDS = (
 )
 
 
-def parse_credentials(raw: str) -> dict[str, str]:
-    email, password, client_id, refresh_token = raw.split("----", 3)
+def parse_credentials(raw: str, separator: str = "----") -> dict[str, str]:
+    email, password, client_id, refresh_token = raw.split(separator, 3)
     return {
         "email": email,
         "password": password,
@@ -145,6 +145,11 @@ def build_email_json(item: dict) -> dict:
     }
 
 
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
+
+
 @app.route("/api/email", methods=["POST"])
 def api_email():
     data = request.get_json(silent=True) or {}
@@ -153,12 +158,13 @@ def api_email():
     if not credentials:
         return jsonify({"code": 400, "msg": "credentials is required"}), 400
 
+    separator = data.get("separator", "----")
     page = int(data.get("page", 1))
     page_size = int(data.get("pageSize", PAGE_SIZE))
     folders = data.get("folders")
 
     try:
-        creds = parse_credentials(credentials)
+        creds = parse_credentials(credentials, separator)
     except ValueError:
         return jsonify({"code": 400, "msg": "Invalid credentials format"}), 400
 
