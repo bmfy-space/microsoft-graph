@@ -192,9 +192,9 @@
 
   .account-item {
     min-height: 82px;
-    padding: 12px 10px;
+    padding: 12px;
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) 58px;
+    grid-template-columns: 40px minmax(0, 1fr) 36px;
     align-items: center;
     gap: 10px;
     background: rgba(255, 255, 255, .72);
@@ -225,7 +225,7 @@
   .account-content {
     min-width: 0;
     display: grid;
-    gap: 7px;
+    gap: 8px;
   }
 
   .account-email {
@@ -238,6 +238,13 @@
     text-overflow: ellipsis;
   }
 
+  .account-meta {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .account-detail {
     min-width: 0;
     color: var(--color-muted);
@@ -247,6 +254,7 @@
     grid-template-columns: 7px minmax(0, 1fr);
     align-items: center;
     gap: 6px;
+    flex: 1;
   }
 
   .account-detail span:last-child {
@@ -269,16 +277,15 @@
   .status-dot.checking, .status-dot.loading { background: var(--color-warning); }
 
   .account-actions {
-    width: 58px;
+    width: 36px;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
   }
 
   .account-status {
-    max-width: 58px;
+    flex: 0 0 auto;
+    max-width: none;
   }
 
   .email-item {
@@ -621,13 +628,15 @@
           <span class="account-avatar" :class="accountStatusClass(account)" aria-hidden="true">{{ accountInitial(account) }}</span>
           <span class="account-content">
             <span class="account-email" :title="account.email">{{ account.email }}</span>
-            <span class="account-detail" :title="accountDetail(account)">
-              <span class="status-dot" :class="accountStatusClass(account)" aria-hidden="true"></span>
-              <span>{{ accountDetail(account) }}</span>
+            <span class="account-meta">
+              <span class="status-pill account-status" :class="accountStatusClass(account)">{{ accountStatusText(account) }}</span>
+              <span class="account-detail" :title="accountDetail(account)">
+                <span class="status-dot" :class="accountStatusClass(account)" aria-hidden="true"></span>
+                <span>{{ accountDetail(account) }}</span>
+              </span>
             </span>
           </span>
           <span class="account-actions">
-            <span class="status-pill account-status" :class="accountStatusClass(account)">{{ accountStatusText(account) }}</span>
             <button class="icon-btn account-menu-trigger" type="button" aria-label="Account actions" @click.stop="toggleFloatMenu(account.id, $event)" @keydown.enter.stop.prevent="toggleFloatMenu(account.id, $event)" @keydown.space.stop.prevent="toggleFloatMenu(account.id, $event)">···</button>
           </span>
         </div>
@@ -1096,10 +1105,10 @@ createApp({
 
     function accountStatusText(account) {
       if (account.checkStatus === 'valid') return 'Valid';
-      if (account.checkStatus === 'invalid') return account.checkError || 'Invalid';
+      if (account.checkStatus === 'invalid') return 'Invalid';
       if (account.checkStatus === 'checking') return 'Checking';
       if (account.status === 'ok') return `${account.emailCount ?? 0} emails`;
-      if (account.status === 'err') return 'Load failed';
+      if (account.status === 'err') return 'Failed';
       if (account.status === 'loading') return 'Loading';
       return 'Ready';
     }
@@ -1110,12 +1119,12 @@ createApp({
     }
 
     function accountDetail(account) {
-      if (account.checkStatus === 'valid') return 'Credential verified';
-      if (account.checkStatus === 'invalid') return 'Credential needs attention';
-      if (account.checkStatus === 'checking') return 'Verification in progress';
-      if (account.status === 'ok') return 'Mailbox cache is ready';
-      if (account.status === 'err') return 'Last mailbox request failed';
-      if (account.status === 'loading') return 'Loading mailbox messages';
+      if (account.checkStatus === 'valid') return 'Verified';
+      if (account.checkStatus === 'invalid') return account.checkError || 'Needs attention';
+      if (account.checkStatus === 'checking') return 'Verifying';
+      if (account.status === 'ok') return 'Cache ready';
+      if (account.status === 'err') return 'Request failed';
+      if (account.status === 'loading') return 'Loading mailbox';
       return `Separator ${account.separator || '----'}`;
     }
 
