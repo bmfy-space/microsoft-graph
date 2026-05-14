@@ -4,188 +4,747 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Microsoft Graph Mail</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; color: #1a1a1a; background: #f5f5f5; }
+  :root {
+    --color-primary: #2563eb;
+    --color-primary-strong: #1d4ed8;
+    --color-primary-soft: #eff6ff;
+    --color-background: #f6f8fb;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f8fafc;
+    --color-border: #dbe4f0;
+    --color-border-strong: #bfccda;
+    --color-foreground: #0f172a;
+    --color-muted: #64748b;
+    --color-subtle: #94a3b8;
+    --color-success: #15803d;
+    --color-success-bg: #dcfce7;
+    --color-warning: #b45309;
+    --color-warning-bg: #fef3c7;
+    --color-danger: #dc2626;
+    --color-danger-bg: #fee2e2;
+    --shadow-menu: 0 16px 40px rgba(15, 23, 42, .14);
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --transition: 160ms ease;
+  }
 
-  /* Layout */
-  .app { display: flex; height: 100vh; }
-  .panel { display: flex; flex-direction: column; border-right: 1px solid #e0e0e0; background: #fff; overflow: hidden; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: var(--color-foreground);
+    background: var(--color-background);
+  }
+
+  button, input, textarea { font: inherit; }
+
+  button { color: inherit; }
+
+  [v-cloak] { display: none; }
+
+  .app {
+    display: flex;
+    height: 100dvh;
+    min-height: 0;
+    background: linear-gradient(180deg, #f8fbff 0%, var(--color-background) 100%);
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: rgba(255, 255, 255, .92);
+    border-right: 1px solid var(--color-border);
+    overflow: hidden;
+  }
+
   .panel:last-child { border-right: none; }
-  .panel-header { height: 44px; padding: 0 16px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 13px; color: #666; background: #fafafa; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
-  .panel-body { flex: 1; overflow-y: auto; min-height: 0; }
 
   .panel-accounts { width: 300px; min-width: 300px; }
   .panel-emails { width: 360px; min-width: 320px; }
   .panel-content { flex: 1; min-width: 0; }
 
-  /* Buttons */
-  .btn { padding: 6px 14px; border: none; border-radius: 5px; font-size: 12px; cursor: pointer; font-weight: 500; transition: background .15s; }
-  .btn-primary { background: #4a90d9; color: #fff; }
-  .btn-primary:hover { background: #3a7bc8; }
-  .btn-ghost { background: transparent; color: #666; border: 1px solid #d0d0d0; }
-  .btn-ghost:hover { background: #f0f0f0; }
-  .btn-sm { padding: 4px 10px; font-size: 11px; }
-  .btn-icon { width: 28px; height: 28px; padding: 0; border: 1px solid #d0d0d0; border-radius: 5px; background: #fff; cursor: pointer; font-size: 16px; color: #666; display: flex; align-items: center; justify-content: center; transition: background .15s; }
-  .btn-icon:hover { background: #f0f0f0; }
+  .panel-header {
+    min-height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, .86);
+    backdrop-filter: blur(14px);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: relative;
+    z-index: 30;
+  }
 
-  /* Account list */
-  .account-item { padding: 10px 40px 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background .1s; position: relative; }
-  .account-item:hover { background: #f8f9fa; }
-  .account-item.active { background: #e8f0fe; border-left: 3px solid #4a90d9; padding-left: 13px; }
-  .account-item .email { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .account-item .status { font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .account-item .status.ok { color: #34a853; }
-  .account-item .status.err { color: #ea4335; }
-  .account-item .status.valid { color: #34a853; }
-  .account-item .status.invalid { color: #ea4335; }
-  .account-item .status.checking { color: #f9a825; }
-  .account-item .actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0; }
-  .account-item:hover .actions { opacity: 1; }
-  .account-item .actions-trigger { background: none; border: 1px solid transparent; cursor: pointer; padding: 2px 6px; border-radius: 4px; color: #aaa; font-size: 14px; line-height: 1; }
-  .account-item:hover .actions-trigger { border-color: #ddd; color: #888; }
-  .account-item .actions-trigger:hover { background: #eee; }
+  .panel-title {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
 
-  /* Global floating menu */
-  .float-menu { position: fixed; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 9999; min-width: 120px; overflow: hidden; }
-  .float-menu.hidden { display: none; }
-  .float-menu div { padding: 8px 14px; font-size: 12px; cursor: pointer; }
-  .float-menu div:hover { background: #f0f4fa; }
-  .float-menu .danger { color: #ea4335; }
-  .account-count { font-size: 11px; color: #999; font-weight: 400; }
+  .panel-title strong {
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
 
-  /* Email list */
-  .email-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background .1s; }
-  .email-item:hover { background: #f8f9fa; }
-  .email-item.active { background: #e8f0fe; }
-  .email-item .subject { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .email-item .meta { display: flex; justify-content: space-between; margin-top: 3px; font-size: 12px; color: #888; }
-  .email-item .sender { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 8px; }
-  .email-item .date { white-space: nowrap; }
-  .email-item .preview { font-size: 12px; color: #999; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel-title span {
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-  /* Email content */
-  .content-header { padding: 16px 20px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
-  .content-header .subject { font-size: 16px; font-weight: 600; line-height: 1.4; }
-  .content-header .from { font-size: 13px; color: #555; margin-top: 8px; }
-  .content-header .from strong { color: #1a1a1a; }
-  .content-header .recipients { font-size: 12px; color: #888; margin-top: 4px; }
-  .content-header .date { font-size: 12px; color: #888; margin-top: 2px; }
-  .content-body { flex: 1; min-height: 0; overflow: hidden; position: relative; }
-  .content-body iframe { width: 100%; height: 100%; border: none; display: block; }
-  .content-body .text-content { padding: 20px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; overflow-y: auto; height: 100%; }
+  .panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    flex-shrink: 0;
+  }
 
-  /* Email content wrapper */
-  .content-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .panel-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
 
-  /* Empty / loading states */
-  .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #bbb; font-size: 13px; }
-  .loading { display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .spinner { width: 20px; height: 20px; border: 2px solid #e0e0e0; border-top-color: #4a90d9; border-radius: 50%; animation: spin .6s linear infinite; margin-right: 8px; }
+  .btn {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+    color: var(--color-foreground);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background var(--transition), border-color var(--transition), color var(--transition), opacity var(--transition), transform var(--transition);
+    touch-action: manipulation;
+  }
+
+  .btn:hover:not(:disabled) { background: #eef2f7; }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: .48; cursor: not-allowed; }
+  .btn:focus-visible, .icon-btn:focus-visible, .menu-item:focus-visible, .list-item:focus-visible, input:focus-visible, textarea:focus-visible, .modal-close:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+
+  .btn-primary { background: var(--color-primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--color-primary-strong); }
+  .btn-ghost { border-color: var(--color-border); background: #fff; color: #334155; }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--color-border-strong); background: #f8fafc; }
+  .btn-sm { min-height: 32px; padding: 0 12px; font-size: 12px; }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--color-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition), border-color var(--transition), color var(--transition), opacity var(--transition);
+  }
+
+  .icon-btn:hover:not(:disabled) { background: var(--color-primary-soft); border-color: #bfdbfe; color: var(--color-primary); }
+
+  .list {
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .list-item {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+  }
+
+  .list-item:hover { background: var(--color-surface-muted); }
+  .list-item:active { transform: translateY(1px); }
+  .list-item.active { background: var(--color-primary-soft); border-color: #bfdbfe; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .08); }
+  .list-item.active::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 999px; background: var(--color-primary); }
+
+  .account-item {
+    min-height: 82px;
+    padding: 12px 10px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 58px;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, .72);
+    border-color: rgba(219, 228, 240, .72);
+  }
+
+  .account-item:hover { border-color: var(--color-border-strong); }
+
+  .account-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: #e2e8f0;
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .04);
+  }
+
+  .account-avatar.ok, .account-avatar.valid { background: var(--color-success-bg); color: var(--color-success); }
+  .account-avatar.err, .account-avatar.invalid { background: var(--color-danger-bg); color: var(--color-danger); }
+  .account-avatar.checking, .account-avatar.loading { background: var(--color-warning-bg); color: var(--color-warning); }
+
+  .account-content {
+    min-width: 0;
+    display: grid;
+    gap: 7px;
+  }
+
+  .account-email {
+    color: var(--color-foreground);
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-detail {
+    min-width: 0;
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    display: grid;
+    grid-template-columns: 7px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+  }
+
+  .account-detail span:last-child {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--color-subtle);
+    flex: 0 0 auto;
+  }
+
+  .status-dot.ok, .status-dot.valid { background: var(--color-success); }
+  .status-dot.err, .status-dot.invalid { background: var(--color-danger); }
+  .status-dot.checking, .status-dot.loading { background: var(--color-warning); }
+
+  .account-actions {
+    width: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .account-status {
+    max-width: 58px;
+  }
+
+  .email-item { padding: 12px 14px; }
+
+  .item-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .item-title {
+    color: var(--color-foreground);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .item-subtitle, .item-preview {
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .email-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .email-sender {
+    flex: 1;
+    min-width: 0;
+    color: var(--color-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .email-date {
+    color: var(--color-subtle);
+    font-size: 12px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-pill {
+    width: fit-content;
+    max-width: 100%;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: var(--color-muted);
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-pill.ok, .status-pill.valid { background: var(--color-success-bg); color: var(--color-success); }
+  .status-pill.err, .status-pill.invalid { background: var(--color-danger-bg); color: var(--color-danger); }
+  .status-pill.checking, .status-pill.loading { background: var(--color-warning-bg); color: var(--color-warning); }
+
+  .account-menu-trigger {
+    opacity: .72;
+  }
+
+  .account-menu-trigger:hover,
+  .account-menu-trigger:focus-visible,
+  .account-item.active .account-menu-trigger { opacity: 1; }
+
+  .menu {
+    position: absolute;
+    min-width: 176px;
+    padding: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-menu);
+    z-index: 1200;
+  }
+
+  .float-menu { position: fixed; z-index: 1000; }
+
+  .menu-item {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-foreground);
+    cursor: pointer;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 650;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .menu-item:hover { background: var(--color-surface-muted); }
+  .menu-item.danger { color: var(--color-danger); }
+  .menu-item:disabled { opacity: .48; cursor: not-allowed; }
+
+  .empty, .loading-state, .error-state {
+    min-height: 100%;
+    padding: 28px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    color: var(--color-muted);
+  }
+
+  .empty strong, .loading-state strong, .error-state strong { color: var(--color-foreground); font-size: 13px; }
+  .empty span, .loading-state span, .error-state span { max-width: 260px; font-size: 12px; line-height: 1.5; }
+
+  .error-state strong { color: var(--color-danger); }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #dbeafe;
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Modal overlay */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-  .modal-overlay.hidden { display: none; }
-  .modal { background: #fff; border-radius: 10px; width: 480px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,.15); }
-  .modal-header { padding: 16px 20px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
-  .modal-header .close-btn { background: none; border: none; font-size: 20px; color: #999; cursor: pointer; line-height: 1; }
-  .modal-header .close-btn:hover { color: #333; }
-  .modal-body { padding: 20px; }
-  .modal-body textarea { width: 100%; height: 160px; border: 1px solid #d0d0d0; border-radius: 6px; padding: 10px 12px; font-size: 12px; font-family: "SF Mono", Consolas, monospace; resize: vertical; outline: none; transition: border-color .15s; }
-  .modal-body textarea:focus { border-color: #4a90d9; }
-  .modal-body textarea::placeholder { color: #aaa; }
-  .modal-body .hint { font-size: 12px; color: #999; margin-top: 8px; }
-  .modal-footer { padding: 12px 20px; border-top: 1px solid #e0e0e0; display: flex; justify-content: flex-end; gap: 8px; }
+  .content-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 
-  /* Export dropdown */
-  .export-menu { position: absolute; right: 0; top: 32px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; min-width: 160px; overflow: hidden; }
-  .export-menu.hidden { display: none; }
-  .export-menu-item { padding: 9px 14px; font-size: 12px; cursor: pointer; transition: background .1s; }
-  .export-menu-item:hover { background: #f0f4fa; }
+  .content-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--color-border);
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .content-subject {
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.42;
+    color: var(--color-foreground);
+  }
+
+  .content-meta {
+    margin-top: 12px;
+    display: grid;
+    gap: 5px;
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .content-meta strong { color: var(--color-foreground); font-weight: 700; }
+
+  .content-body { flex: 1; min-height: 0; overflow: hidden; background: #fff; }
+  .content-body iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+  .text-content { height: 100%; overflow-y: auto; padding: 22px; white-space: pre-wrap; word-break: break-word; line-height: 1.7; color: #1e293b; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .48);
+  }
+
+  .modal {
+    width: 520px;
+    max-width: 100%;
+    max-height: min(720px, calc(100dvh - 40px));
+    border: 1px solid rgba(255, 255, 255, .7);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, .26);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    min-height: 60px;
+    padding: 0 18px 0 22px;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .modal-header strong { font-size: 15px; }
+  .modal-header span { display: block; margin-top: 2px; color: var(--color-muted); font-size: 12px; }
+
+  .modal-close {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .modal-close:hover { background: var(--color-surface-muted); color: var(--color-foreground); }
+
+  .modal-body {
+    padding: 20px 22px;
+    overflow-y: auto;
+    display: grid;
+    gap: 14px;
+  }
+
+  .field { display: grid; gap: 7px; }
+  .field label { color: #334155; font-size: 12px; font-weight: 750; }
+  .field input, .field textarea {
+    width: 100%;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--color-foreground);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .field input { min-height: 42px; padding: 0 12px; font-family: "SF Mono", Consolas, ui-monospace, monospace; font-size: 12px; }
+  .field textarea { min-height: 180px; padding: 12px; resize: vertical; font-family: "SF Mono", Consolas, ui-monospace, monospace; font-size: 12px; line-height: 1.55; }
+  .field input:focus, .field textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, .12); }
+  .field-hint { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
+
+  .modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 1200;
+    transform: translateX(-50%);
+    min-height: 42px;
+    max-width: calc(100vw - 32px);
+    padding: 0 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-foreground);
+    box-shadow: var(--shadow-menu);
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .fade-enter-active, .fade-leave-active { transition: opacity var(--transition), transform var(--transition); }
+  .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(4px); }
+
+  @media (max-width: 900px) {
+    .panel-accounts { width: 260px; min-width: 260px; }
+    .panel-emails { width: 320px; min-width: 300px; }
+    .panel-header { padding: 0 12px; }
+  }
+
+  @media (max-width: 760px) {
+    .app { overflow-x: auto; }
+    .panel-content { min-width: 420px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
+  }
 </style>
 </head>
 <body>
-<div class="app">
+<div id="app" class="app" v-cloak>
+  <section class="panel panel-accounts" aria-label="Accounts">
+    <header class="panel-header">
+      <div class="panel-title">
+        <strong>Accounts</strong>
+        <span>{{ accountCountText }}</span>
+      </div>
+      <div class="panel-actions">
+        <button class="btn btn-sm btn-ghost" type="button" @click="openImportModal">Import</button>
+        <button class="btn btn-sm btn-ghost" type="button" :disabled="checkingAll || !accounts.length" @click.stop="toggleActionsMenu">
+          {{ checkingAll ? 'Checking' : 'Actions' }}
+        </button>
+        <transition name="fade">
+          <div v-if="actionsMenuOpen" class="menu" style="right:0;top:38px" @click.stop>
+            <button class="menu-item" type="button" :disabled="checkingAll || !accounts.length" @click="checkAllAccounts">Check all</button>
+            <button v-if="hasInvalidAccounts" class="menu-item danger" type="button" @click="removeInvalidAccounts">Clear invalid</button>
+            <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportCopy">Copy all</button>
+            <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportDownload">Download .txt</button>
+          </div>
+        </transition>
+      </div>
+    </header>
 
-  <!-- Left: Accounts -->
-  <div class="panel panel-accounts">
-    <div class="panel-header">
-      <span>Accounts <span class="account-count" id="accountCount"></span></span>
-      <div style="display:flex;gap:4px;position:relative">
-        <button class="btn btn-sm btn-ghost" onclick="openImportModal()">Import</button>
-        <button class="btn btn-sm btn-ghost" onclick="toggleActionsMenu(event)" id="actionsBtn">Actions</button>
-        <div class="export-menu hidden" id="actionsMenu">
-          <div class="export-menu-item" onclick="checkAllAccounts()">Check all</div>
-          <div class="export-menu-item hidden" id="clearInvalidItem" onclick="removeInvalidAccounts()">Clear invalid</div>
-          <div class="export-menu-item" onclick="exportCopy()">Copy all</div>
-          <div class="export-menu-item" onclick="exportDownload()">Download .txt</div>
+    <div class="panel-body">
+      <div v-if="!accounts.length" class="empty">
+        <strong>No accounts yet</strong>
+        <span>Import credentials to load mail from Microsoft Graph.</span>
+      </div>
+      <div v-else class="list">
+        <div v-for="account in accounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
+          <span class="account-avatar" :class="accountStatusClass(account)" aria-hidden="true">{{ accountInitial(account) }}</span>
+          <span class="account-content">
+            <span class="account-email" :title="account.email">{{ account.email }}</span>
+            <span class="account-detail" :title="accountDetail(account)">
+              <span class="status-dot" :class="accountStatusClass(account)" aria-hidden="true"></span>
+              <span>{{ accountDetail(account) }}</span>
+            </span>
+          </span>
+          <span class="account-actions">
+            <span class="status-pill account-status" :class="accountStatusClass(account)">{{ accountStatusText(account) }}</span>
+            <button class="icon-btn account-menu-trigger" type="button" aria-label="Account actions" @click.stop="toggleFloatMenu(account.id, $event)" @keydown.enter.stop.prevent="toggleFloatMenu(account.id, $event)" @keydown.space.stop.prevent="toggleFloatMenu(account.id, $event)">···</button>
+          </span>
         </div>
       </div>
     </div>
-    <div class="panel-body" id="accountList">
-      <div class="empty">No accounts</div>
-    </div>
-  </div>
+  </section>
 
-  <!-- Middle: Emails -->
-  <div class="panel panel-emails">
-    <div class="panel-header">
-      <span id="emailsTitle">Emails</span>
-      <button class="btn btn-sm btn-ghost" onclick="refreshEmails()" id="refreshBtn" style="display:none">Refresh</button>
-    </div>
-    <div class="panel-body" id="emailList">
-      <div class="empty">Select an account</div>
-    </div>
-  </div>
-
-  <!-- Right: Content -->
-  <div class="panel panel-content">
-    <div class="panel-header">Content</div>
-    <div class="panel-body" id="emailContent">
-      <div class="empty">Select an email</div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Floating item menu -->
-<div class="float-menu hidden" id="floatMenu">
-  <div id="floatMenuCopy">Copy</div>
-  <div class="danger" id="floatMenuRemove">Remove</div>
-</div>
-
-<!-- Import Modal -->
-<div class="modal-overlay hidden" id="importModal">
-  <div class="modal">
-    <div class="modal-header">
-      <span>Import Accounts</span>
-      <button class="close-btn" onclick="closeImportModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <label style="font-size:12px;color:#666;white-space:nowrap">Separator</label>
-        <input id="separatorInput" value="----" style="flex:1;border:1px solid #d0d0d0;border-radius:6px;padding:6px 10px;font-size:12px;font-family:'SF Mono',Consolas,monospace;outline:none;transition:border-color .15s" onfocus="this.style.borderColor='#4a90d9'" onblur="this.style.borderColor='#d0d0d0'">
+  <section class="panel panel-emails" aria-label="Emails">
+    <header class="panel-header">
+      <div class="panel-title">
+        <strong>{{ emailsTitle }}</strong>
+        <span>{{ activeAccount ? activeAccount.email : 'Select an account to load messages' }}</span>
       </div>
-      <textarea id="importInput" placeholder="每行一条凭证，默认用 ---- 分隔：&#10;email----password----clientId----refreshToken"></textarea>
-      <div class="hint">Supports multiple lines, duplicates are automatically skipped.</div>
+      <button v-if="activeAccount" class="btn btn-sm btn-ghost" type="button" :disabled="loadingEmails" @click="refreshEmails">
+        {{ loadingEmails ? 'Loading' : 'Refresh' }}
+      </button>
+    </header>
+
+    <div class="panel-body">
+      <div v-if="!activeAccount" class="empty">
+        <strong>Select an account</strong>
+        <span>Choose an account from the left panel to view recent emails.</span>
+      </div>
+      <div v-else-if="loadingEmails" class="loading-state">
+        <span class="spinner" aria-hidden="true"></span>
+        <strong>Loading emails</strong>
+        <span>Fetching the latest inbox and junk messages.</span>
+      </div>
+      <div v-else-if="emailError" class="error-state">
+        <strong>Unable to load emails</strong>
+        <span>{{ emailError }}</span>
+        <button class="btn btn-sm btn-primary" type="button" @click="refreshEmails">Try again</button>
+      </div>
+      <div v-else-if="!activeEmails.length" class="empty">
+        <strong>No emails</strong>
+        <span>This account has no cached or fetched messages yet.</span>
+      </div>
+      <div v-else class="list">
+        <button v-for="email in activeEmails" :key="email.id" class="list-item email-item" :class="{ active: email.id === activeEmailId }" type="button" @click="selectEmail(email.id)">
+          <span class="item-main">
+            <span class="item-title" :title="email.subject">{{ email.subject || '(No subject)' }}</span>
+            <span class="email-meta">
+              <span class="email-sender">{{ emailSender(email) }}</span>
+              <span class="email-date">{{ formatDate(email.date) }}</span>
+            </span>
+            <span class="item-preview">{{ email.preview || 'No preview available' }}</span>
+          </span>
+        </button>
+      </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="importAccounts()">Import</button>
+  </section>
+
+  <section class="panel panel-content" aria-label="Content">
+    <header class="panel-header">
+      <div class="panel-title">
+        <strong>Content</strong>
+        <span>{{ activeEmail ? 'Message details' : 'Select an email to read' }}</span>
+      </div>
+    </header>
+
+    <div class="panel-body">
+      <div v-if="!activeEmail" class="empty">
+        <strong>Select an email</strong>
+        <span>The selected message content will appear in this panel.</span>
+      </div>
+      <div v-else class="content-wrap">
+        <div class="content-header">
+          <div class="content-subject">{{ activeEmail.subject || '(No subject)' }}</div>
+          <div class="content-meta">
+            <div><strong>From:</strong> {{ emailFrom(activeEmail) }}</div>
+            <div v-if="recipientText(activeEmail.to)"><strong>To:</strong> {{ recipientText(activeEmail.to) }}</div>
+            <div v-if="recipientText(activeEmail.cc)"><strong>Cc:</strong> {{ recipientText(activeEmail.cc) }}</div>
+            <div><strong>Date:</strong> {{ formatDate(activeEmail.date) }}</div>
+          </div>
+        </div>
+        <div class="content-body">
+          <iframe v-if="isHtmlEmail(activeEmail)" sandbox="allow-same-origin" :srcdoc="activeEmail.body.content || ''" title="Email HTML content"></iframe>
+          <div v-else class="text-content">{{ activeEmail.body?.content || '' }}</div>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <transition name="fade">
+    <div v-if="floatMenu.open" class="menu float-menu" :style="{ left: floatMenu.left + 'px', top: floatMenu.top + 'px' }" @click.stop>
+      <button class="menu-item" type="button" @click="copyAccount(floatMenu.accountId)">Copy</button>
+      <button class="menu-item danger" type="button" @click="removeAccount(floatMenu.accountId)">Remove</button>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="importModalOpen" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="import-title" @click.self="closeImportModal">
+      <form class="modal" @submit.prevent="importAccounts">
+        <div class="modal-header">
+          <div>
+            <strong id="import-title">Import Accounts</strong>
+            <span>Add one credential per line.</span>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close import dialog" @click="closeImportModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label for="separatorInput">Separator</label>
+            <input id="separatorInput" v-model="separatorInput" autocomplete="off" spellcheck="false">
+            <div class="field-hint">Default format: email----password----clientId----refreshToken</div>
+          </div>
+          <div class="field">
+            <label for="importInput">Credentials</label>
+            <textarea id="importInput" ref="importInputRef" v-model="importText" placeholder="email----password----clientId----refreshToken"></textarea>
+            <div class="field-hint">Multiple lines are supported. Existing identical credentials are skipped automatically.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="closeImportModal">Cancel</button>
+          <button class="btn btn-primary" type="submit" :disabled="!importText.trim()">Import</button>
+        </div>
+      </form>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="toast" class="toast" role="status" aria-live="polite">{{ toast }}</div>
+  </transition>
 </div>
 
 <script>
 const API_BASE = window.location.origin;
-let accounts = [];
-let activeAccountId = null;
-let activeEmailId = null;
-let accountSeq = 0;
-
-// ── IndexedDB ──
-
 const DB_NAME = 'GraphMail';
 const DB_VERSION = 2;
 
@@ -223,9 +782,10 @@ function dbGetAllBySeq() {
 }
 
 function dbPut(store, value) {
+  const plainValue = JSON.parse(JSON.stringify(value));
   return openDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).put(value);
+    tx.objectStore(store).put(plainValue);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   }));
@@ -240,15 +800,6 @@ function dbDelete(store, key) {
   }));
 }
 
-function dbGetAll(store) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  }));
-}
-
 function dbGet(store, key) {
   return openDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly');
@@ -258,393 +809,410 @@ function dbGet(store, key) {
   }));
 }
 
-// ── Modal ──
+const { createApp, ref, computed, onMounted, onBeforeUnmount, nextTick } = Vue;
 
-function openImportModal() {
-  document.getElementById('importModal').classList.remove('hidden');
-  document.getElementById('importInput').focus();
-}
+createApp({
+  setup() {
+    const accounts = ref([]);
+    const activeAccountId = ref(null);
+    const activeEmailId = ref(null);
+    const accountSeq = ref(0);
+    const importModalOpen = ref(false);
+    const actionsMenuOpen = ref(false);
+    const checkingAll = ref(false);
+    const loadingEmails = ref(false);
+    const emailError = ref('');
+    const importText = ref('');
+    const separatorInput = ref('----');
+    const importInputRef = ref(null);
+    const toast = ref('');
+    const toastTimer = ref(null);
+    const floatMenu = ref({ open: false, accountId: null, left: 0, top: 0 });
 
-function closeImportModal() {
-  document.getElementById('importModal').classList.add('hidden');
-  document.getElementById('importInput').value = '';
-}
-
-document.getElementById('importModal').addEventListener('click', function(e) {
-  if (e.target === this) closeImportModal();
-});
-
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeImportModal(); closeActionsMenu(); document.querySelectorAll('.item-menu.show').forEach(m => m.classList.remove('show')); }
-});
-
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('#actionsMenu') && !e.target.closest('#actionsBtn')) closeActionsMenu();
-  if (!e.target.closest('.float-menu') && !e.target.closest('.actions-trigger')) closeFloatMenu();
-});
-
-// ── Actions Menu ──
-
-function getExportText() {
-  return accounts.map(a => a.raw).join('\n');
-}
-
-function toggleActionsMenu(e) {
-  e.stopPropagation();
-  document.getElementById('actionsMenu').classList.toggle('hidden');
-}
-
-function closeActionsMenu() {
-  document.getElementById('actionsMenu').classList.add('hidden');
-}
-
-async function exportCopy() {
-  closeActionsMenu();
-  if (!accounts.length) return;
-  try {
-    await navigator.clipboard.writeText(getExportText());
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = getExportText();
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }
-}
-
-function exportDownload() {
-  closeActionsMenu();
-  if (!accounts.length) return;
-  const blob = new Blob([getExportText()], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'accounts.txt';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-// ── Accounts ──
-
-let floatMenuTarget = null;
-
-function openFloatMenu(id, btn) {
-  const menu = document.getElementById('floatMenu');
-  const rect = btn.getBoundingClientRect();
-  menu.style.left = rect.right - 120 + 'px';
-  menu.style.top = rect.bottom + 4 + 'px';
-  menu.classList.remove('hidden');
-  floatMenuTarget = id;
-  document.getElementById('floatMenuCopy').onclick = function(e) { e.stopPropagation(); copyAccount(floatMenuTarget, e); closeFloatMenu(); };
-  document.getElementById('floatMenuRemove').onclick = function(e) { e.stopPropagation(); removeAccount(floatMenuTarget, e); closeFloatMenu(); };
-}
-
-function closeFloatMenu() {
-  document.getElementById('floatMenu').classList.add('hidden');
-  floatMenuTarget = null;
-}
-
-function toggleItemMenu(id, e) {
-  e.stopPropagation();
-  const menu = document.getElementById('floatMenu');
-  if (!menu.classList.contains('hidden') && floatMenuTarget === id) { closeFloatMenu(); return; }
-  openFloatMenu(id, e.currentTarget);
-}
-
-function showItemMenu(id, btn) {
-  if (floatMenuTarget === id) return;
-  openFloatMenu(id, btn);
-}
-
-function hideItemMenu(id) {
-  closeFloatMenu();
-}
-
-async function importAccounts() {
-  const raw = document.getElementById('importInput').value.trim();
-  const separator = document.getElementById('separatorInput').value || '----';
-  if (!raw) return;
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  let added = 0;
-  for (const line of lines) {
-    if (accounts.some(a => a.raw === line)) continue;
-    const parts = line.split(separator);
-    const email = parts[0] || line.slice(0, 30);
-    const acc = { id: crypto.randomUUID(), email, raw: line, separator, seq: ++accountSeq, status: null, emailCount: null };
-    accounts.push(acc);
-    await dbPut('accounts', acc);
-    added++;
-  }
-  closeImportModal();
-  renderAccounts();
-  if (added > 0 && !activeAccountId) selectAccount(accounts[0].id);
-}
-
-async function removeAccount(id, e) {
-  e.stopPropagation();
-  accounts = accounts.filter(a => a.id !== id);
-  await dbDelete('accounts', id);
-  await dbDelete('emails', id);
-  if (activeAccountId === id) {
-    activeAccountId = null;
-    activeEmailId = null;
-    document.getElementById('emailList').innerHTML = '<div class="empty">Select an account</div>';
-    document.getElementById('emailContent').innerHTML = '<div class="empty">Select an email</div>';
-    document.getElementById('emailsTitle').textContent = 'Emails';
-    document.getElementById('refreshBtn').style.display = 'none';
-  }
-  renderAccounts();
-}
-
-async function removeInvalidAccounts() {
-  closeActionsMenu();
-  const invalid = accounts.filter(a => a.checkStatus === 'invalid');
-  if (!invalid.length) return;
-  for (const a of invalid) {
-    await dbDelete('accounts', a.id);
-    await dbDelete('emails', a.id);
-  }
-  accounts = accounts.filter(a => a.checkStatus !== 'invalid');
-  if (activeAccountId && !accounts.some(a => a.id === activeAccountId)) {
-    activeAccountId = null;
-    activeEmailId = null;
-    document.getElementById('emailList').innerHTML = '<div class="empty">Select an account</div>';
-    document.getElementById('emailContent').innerHTML = '<div class="empty">Select an email</div>';
-    document.getElementById('emailsTitle').textContent = 'Emails';
-    document.getElementById('refreshBtn').style.display = 'none';
-  }
-  renderAccounts();
-}
-
-async function copyAccount(id, e) {
-  e.stopPropagation();
-  const acc = accounts.find(a => a.id === id);
-  if (!acc) return;
-  try {
-    await navigator.clipboard.writeText(acc.raw);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = acc.raw;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }
-}
-
-async function checkAllAccounts() {
-  closeActionsMenu();
-  if (!accounts.length) return;
-  const btn = document.getElementById('actionsBtn');
-  btn.disabled = true;
-  btn.textContent = '...';
-
-  // Set all to checking
-  accounts.forEach(a => { a.checkStatus = 'checking'; });
-  renderAccounts();
-
-  try {
-    const resp = await fetch(`${API_BASE}/api/check`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        credentials: accounts.map(a => a.raw),
-        separator: accounts[0]?.separator || '----',
-      }),
+    const activeAccount = computed(() => accounts.value.find(account => account.id === activeAccountId.value) || null);
+    const activeEmails = computed(() => activeAccount.value?.emails || []);
+    const activeEmail = computed(() => activeEmails.value.find(email => email.id === activeEmailId.value) || null);
+    const accountCountText = computed(() => accounts.value.length ? `${accounts.value.length} account${accounts.value.length === 1 ? '' : 's'}` : 'No accounts');
+    const hasInvalidAccounts = computed(() => accounts.value.some(account => account.checkStatus === 'invalid'));
+    const emailsTitle = computed(() => {
+      if (loadingEmails.value) return 'Loading';
+      if (!activeAccount.value) return 'Emails';
+      return `Emails (${activeEmails.value.length || activeAccount.value.emailCount || 0})`;
     });
-    const data = await resp.json();
-    if (data.code === 200 && data.data) {
-      for (const r of data.data) {
-        const acc = accounts.find(a => a.email === r.email);
-        if (acc) {
-          acc.checkStatus = r.valid ? 'valid' : 'invalid';
-          acc.checkError = r.error || '';
-          await dbPut('accounts', acc);
-        }
+
+    function showToast(message) {
+      toast.value = message;
+      if (toastTimer.value) window.clearTimeout(toastTimer.value);
+      toastTimer.value = window.setTimeout(() => { toast.value = ''; }, 3200);
+    }
+
+    function closeActionsMenu() {
+      actionsMenuOpen.value = false;
+    }
+
+    function closeFloatMenu() {
+      floatMenu.value = { open: false, accountId: null, left: 0, top: 0 };
+    }
+
+    function closeOverlays() {
+      closeActionsMenu();
+      closeFloatMenu();
+    }
+
+    function toggleActionsMenu() {
+      if (!accounts.value.length || checkingAll.value) return;
+      actionsMenuOpen.value = !actionsMenuOpen.value;
+      closeFloatMenu();
+    }
+
+    function toggleFloatMenu(accountId, event) {
+      const current = floatMenu.value;
+      if (current.open && current.accountId === accountId) {
+        closeFloatMenu();
+        return;
+      }
+      const rect = event.currentTarget.getBoundingClientRect();
+      floatMenu.value = {
+        open: true,
+        accountId,
+        left: Math.max(8, rect.right - 176),
+        top: rect.bottom + 6,
+      };
+      closeActionsMenu();
+    }
+
+    function openImportModal() {
+      closeOverlays();
+      importModalOpen.value = true;
+      nextTick(() => importInputRef.value?.focus());
+    }
+
+    function closeImportModal() {
+      importModalOpen.value = false;
+      importText.value = '';
+    }
+
+    function getExportText() {
+      return accounts.value.map(account => account.raw).join('\n');
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
       }
     }
-  } catch {
-    accounts.forEach(a => { a.checkStatus = ''; });
-  }
 
-  renderAccounts();
-  btn.disabled = false;
-  btn.textContent = 'Actions';
-}
+    async function exportCopy() {
+      closeActionsMenu();
+      if (!accounts.value.length) return;
+      await copyText(getExportText());
+      showToast('All accounts copied');
+    }
 
-function renderAccounts() {
-  const el = document.getElementById('accountList');
-  document.getElementById('accountCount').textContent = accounts.length ? `(${accounts.length})` : '';
-  const hasInvalid = accounts.some(a => a.checkStatus === 'invalid');
-  document.getElementById('clearInvalidItem').classList.toggle('hidden', !hasInvalid);
-  if (!accounts.length) { el.innerHTML = '<div class="empty">No accounts</div>'; return; }
-  el.innerHTML = accounts.map(a => {
-    const statusClass = a.checkStatus === 'valid' ? 'valid' : a.checkStatus === 'invalid' ? 'invalid' : a.checkStatus === 'checking' ? 'checking' : '';
-    const statusText = a.checkStatus === 'valid' ? '✓ Valid' :
-                       a.checkStatus === 'invalid' ? `✗ ${a.checkError || 'Invalid'}` :
-                       a.checkStatus === 'checking' ? 'Checking...' :
-                       a.status === 'ok' ? `✓ ${a.emailCount ?? 0} emails` :
-                       a.status === 'err' ? '✗ Failed' :
-                       a.status === 'loading' ? 'Loading...' : '—';
-    return `
-    <div class="account-item ${a.id === activeAccountId ? 'active' : ''}" onclick="selectAccount('${a.id}')">
-      <div class="email" title="${a.email}">${a.email}</div>
-      <div class="status ${statusClass}">${statusText}</div>
-      <div class="actions">
-        <button class="actions-trigger" data-acc="${a.id}" onclick="toggleItemMenu('${a.id}', event)" onmouseenter="showItemMenu('${a.id}', this)" title="Actions">···</button>
-      </div>
-    </div>`;
-  }).join('');
-}
+    function exportDownload() {
+      closeActionsMenu();
+      if (!accounts.value.length) return;
+      const blob = new Blob([getExportText()], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'accounts.txt';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Download started');
+    }
 
-// ── Emails ──
+    async function importAccounts() {
+      const raw = importText.value.trim();
+      const separator = separatorInput.value || '----';
+      if (!raw) return;
+      const lines = raw.split('\n').map(line => line.trim()).filter(Boolean);
+      let added = 0;
+      for (const line of lines) {
+        if (accounts.value.some(account => account.raw === line)) continue;
+        const parts = line.split(separator);
+        const email = parts[0] || line.slice(0, 30);
+        const account = { id: crypto.randomUUID(), email, raw: line, separator, seq: ++accountSeq.value, status: null, emailCount: null };
+        accounts.value.push(account);
+        await dbPut('accounts', account);
+        added++;
+      }
+      closeImportModal();
+      if (added > 0 && !activeAccountId.value && accounts.value[0]) {
+        await selectAccount(accounts.value[0].id);
+      }
+      showToast(added ? `${added} account${added === 1 ? '' : 's'} imported` : 'No new accounts imported');
+    }
 
-async function selectAccount(id) {
-  activeAccountId = id;
-  activeEmailId = null;
-  const acc = accounts.find(a => a.id === id);
-  renderAccounts();
-  document.getElementById('emailContent').innerHTML = '<div class="empty">Select an email</div>';
-  document.getElementById('refreshBtn').style.display = 'inline-block';
+    async function removeAccount(id) {
+      closeFloatMenu();
+      accounts.value = accounts.value.filter(account => account.id !== id);
+      await dbDelete('accounts', id);
+      await dbDelete('emails', id);
+      if (activeAccountId.value === id) {
+        activeAccountId.value = null;
+        activeEmailId.value = null;
+        emailError.value = '';
+      }
+      showToast('Account removed');
+    }
 
-  // Try cached emails first
-  const cached = await dbGet('emails', id);
-  if (cached?.emails?.length) {
-    acc.emails = cached.emails;
-    acc.status = 'ok';
-    acc.emailCount = cached.emails.length;
-    renderAccounts();
-    document.getElementById('emailsTitle').textContent = `Emails (${cached.emails.length})`;
-    renderEmails(acc.emails);
-  } else {
-    await loadEmails(acc);
-  }
-}
+    async function removeInvalidAccounts() {
+      closeActionsMenu();
+      const invalid = accounts.value.filter(account => account.checkStatus === 'invalid');
+      if (!invalid.length) return;
+      for (const account of invalid) {
+        await dbDelete('accounts', account.id);
+        await dbDelete('emails', account.id);
+      }
+      accounts.value = accounts.value.filter(account => account.checkStatus !== 'invalid');
+      if (activeAccountId.value && !accounts.value.some(account => account.id === activeAccountId.value)) {
+        activeAccountId.value = null;
+        activeEmailId.value = null;
+        emailError.value = '';
+      }
+      showToast(`${invalid.length} invalid account${invalid.length === 1 ? '' : 's'} cleared`);
+    }
 
-async function refreshEmails() {
-  const acc = accounts.find(a => a.id === activeAccountId);
-  if (acc) await loadEmails(acc);
-}
+    async function copyAccount(id) {
+      const account = accounts.value.find(item => item.id === id);
+      closeFloatMenu();
+      if (!account) return;
+      await copyText(account.raw);
+      showToast('Account copied');
+    }
 
-async function loadEmails(acc) {
-  const list = document.getElementById('emailList');
-  document.getElementById('emailsTitle').textContent = 'Loading...';
-  list.innerHTML = '<div class="loading"><div class="spinner"></div>Loading</div>';
+    async function checkAllAccounts() {
+      closeActionsMenu();
+      if (!accounts.value.length || checkingAll.value) return;
+      checkingAll.value = true;
+      accounts.value.forEach(account => { account.checkStatus = 'checking'; account.checkError = ''; });
+      try {
+        const resp = await fetch(`${API_BASE}/api/check`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credentials: accounts.value.map(account => account.raw),
+            separator: accounts.value[0]?.separator || '----',
+          }),
+        });
+        const data = await resp.json();
+        if (data.code === 200 && data.data) {
+          for (const result of data.data) {
+            const account = accounts.value.find(item => item.email === result.email);
+            if (account) {
+              account.checkStatus = result.valid ? 'valid' : 'invalid';
+              account.checkError = result.error || '';
+              await dbPut('accounts', account);
+            }
+          }
+          showToast('Account check finished');
+        } else {
+          throw new Error(data.msg || 'Check failed');
+        }
+      } catch (error) {
+        accounts.value.forEach(account => { account.checkStatus = ''; });
+        showToast(error.message || 'Account check failed');
+      } finally {
+        checkingAll.value = false;
+      }
+    }
 
-  try {
-    const resp = await fetch(`${API_BASE}/api/email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credentials: acc.raw, separator: acc.separator || '----', page: 1, pageSize: 50 }),
+    async function selectAccount(id) {
+      activeAccountId.value = id;
+      activeEmailId.value = null;
+      emailError.value = '';
+      closeOverlays();
+      const account = accounts.value.find(item => item.id === id);
+      if (!account) return;
+      const cached = await dbGet('emails', id);
+      if (cached?.emails?.length) {
+        account.emails = cached.emails;
+        account.status = 'ok';
+        account.emailCount = cached.emails.length;
+        await dbPut('accounts', account);
+      } else {
+        await loadEmails(account);
+      }
+    }
+
+    async function refreshEmails() {
+      const account = activeAccount.value;
+      if (account) await loadEmails(account);
+    }
+
+    async function loadEmails(account) {
+      loadingEmails.value = true;
+      emailError.value = '';
+      account.status = 'loading';
+      try {
+        const resp = await fetch(`${API_BASE}/api/email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credentials: account.raw, separator: account.separator || '----', page: 1, pageSize: 50 }),
+        });
+        const data = await resp.json();
+        if (data.code !== 200) throw new Error(data.msg || 'Email request failed');
+        account.emails = data.data.emails || [];
+        account.status = 'ok';
+        account.emailCount = data.data.total;
+        await dbPut('accounts', account);
+        await dbPut('emails', { accountId: account.id, emails: account.emails });
+      } catch (error) {
+        account.status = 'err';
+        account.emails = [];
+        emailError.value = error.message || 'Email request failed';
+        await dbPut('accounts', account);
+      } finally {
+        loadingEmails.value = false;
+      }
+    }
+
+    function selectEmail(id) {
+      activeEmailId.value = id;
+      closeOverlays();
+    }
+
+    function accountStatusClass(account) {
+      if (account.checkStatus) return account.checkStatus;
+      return account.status || '';
+    }
+
+    function accountStatusText(account) {
+      if (account.checkStatus === 'valid') return 'Valid';
+      if (account.checkStatus === 'invalid') return account.checkError || 'Invalid';
+      if (account.checkStatus === 'checking') return 'Checking';
+      if (account.status === 'ok') return `${account.emailCount ?? 0} emails`;
+      if (account.status === 'err') return 'Load failed';
+      if (account.status === 'loading') return 'Loading';
+      return 'Ready';
+    }
+
+    function accountInitial(account) {
+      const source = (account.email || account.raw || '').trim();
+      return (source[0] || 'A').toUpperCase();
+    }
+
+    function accountDetail(account) {
+      if (account.checkStatus === 'valid') return 'Credential verified';
+      if (account.checkStatus === 'invalid') return 'Credential needs attention';
+      if (account.checkStatus === 'checking') return 'Verification in progress';
+      if (account.status === 'ok') return 'Mailbox cache is ready';
+      if (account.status === 'err') return 'Last mailbox request failed';
+      if (account.status === 'loading') return 'Loading mailbox messages';
+      return `Separator ${account.separator || '----'}`;
+    }
+
+    function emailSender(email) {
+      return email.from?.name || email.from?.address || 'Unknown sender';
+    }
+
+    function emailFrom(email) {
+      const from = email.from || {};
+      if (from.name && from.address) return `${from.name} <${from.address}>`;
+      return from.name || from.address || 'Unknown sender';
+    }
+
+    function recipientText(recipients) {
+      return (recipients || []).join(', ');
+    }
+
+    function isHtmlEmail(email) {
+      return email?.body?.contentType === 'html';
+    }
+
+    function formatDate(raw) {
+      if (!raw) return '?';
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return '?';
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mi = String(date.getMinutes()).padStart(2, '0');
+      return `${mm}-${dd} ${hh}:${mi}`;
+    }
+
+    function handleDocumentClick() {
+      closeOverlays();
+    }
+
+    function handleKeydown(event) {
+      if (event.key !== 'Escape') return;
+      if (importModalOpen.value) {
+        closeImportModal();
+      }
+      closeOverlays();
+    }
+
+    onMounted(async () => {
+      document.addEventListener('click', handleDocumentClick);
+      document.addEventListener('keydown', handleKeydown);
+      try {
+        accounts.value = await dbGetAllBySeq();
+        accountSeq.value = accounts.value.length ? Math.max(...accounts.value.map(account => account.seq || 0)) : 0;
+      } catch (error) {
+        showToast(`Failed to load local data: ${error.message || error}`);
+      }
     });
-    const data = await resp.json();
-    if (data.code !== 200) throw new Error(data.msg);
 
-    acc.emails = data.data.emails;
-    acc.status = 'ok';
-    acc.emailCount = data.data.total;
-    await dbPut('accounts', acc);
-    await dbPut('emails', { accountId: acc.id, emails: acc.emails });
-    renderAccounts();
-    document.getElementById('emailsTitle').textContent = `Emails (${data.data.total})`;
-    renderEmails(acc.emails);
-  } catch (e) {
-    acc.status = 'err';
-    acc.emails = [];
-    await dbPut('accounts', acc);
-    renderAccounts();
-    document.getElementById('emailsTitle').textContent = 'Emails';
-    list.innerHTML = `<div class="empty">${e.message}</div>`;
-  }
-}
+    onBeforeUnmount(() => {
+      document.removeEventListener('click', handleDocumentClick);
+      document.removeEventListener('keydown', handleKeydown);
+      if (toastTimer.value) window.clearTimeout(toastTimer.value);
+    });
 
-function renderEmails(emails) {
-  const el = document.getElementById('emailList');
-  if (!emails.length) { el.innerHTML = '<div class="empty">No emails</div>'; return; }
-  el.innerHTML = emails.map(e => {
-    const d = e.date ? formatDate(e.date) : '?';
-    const sender = e.from?.name || e.from?.address || 'Unknown';
-    return `
-      <div class="email-item ${e.id === activeEmailId ? 'active' : ''}" onclick="selectEmail('${e.id}')">
-        <div class="subject">${esc(e.subject)}</div>
-        <div class="meta"><span class="sender">${esc(sender)}</span><span class="date">${d}</span></div>
-        <div class="preview">${esc(e.preview)}</div>
-      </div>`;
-  }).join('');
-}
-
-// ── Content ──
-
-function selectEmail(id) {
-  activeEmailId = id;
-  const acc = accounts.find(a => a.id === activeAccountId);
-  if (!acc?.emails) return;
-  const email = acc.emails.find(e => e.id === id);
-  if (!email) return;
-  renderEmails(acc.emails);
-  renderContent(email);
-}
-
-function renderContent(email) {
-  const el = document.getElementById('emailContent');
-  const d = email.date ? formatDate(email.date) : '?';
-  const from = email.from;
-  const fromStr = from.name ? `${from.name} <${from.address}>` : from.address;
-  const toStr = (email.to || []).join(', ');
-  const ccStr = (email.cc || []).join(', ');
-
-  let bodyHtml;
-  if (email.body.contentType === 'html') {
-    bodyHtml = `<iframe sandbox="allow-same-origin" srcdoc="${escAttr(email.body.content)}"></iframe>`;
-  } else {
-    bodyHtml = `<div class="text-content">${esc(email.body.content)}</div>`;
-  }
-
-  el.innerHTML = `
-    <div class="content-wrap">
-      <div class="content-header">
-        <div class="subject">${esc(email.subject)}</div>
-        <div class="from"><strong>${esc(fromStr)}</strong></div>
-        ${toStr ? `<div class="recipients">To: ${esc(toStr)}</div>` : ''}
-        ${ccStr ? `<div class="recipients">Cc: ${esc(ccStr)}</div>` : ''}
-        <div class="date">${d}</div>
-      </div>
-      <div class="content-body">${bodyHtml}</div>
-    </div>`;
-}
-
-// ── Util ──
-
-function formatDate(raw) {
-  const d = new Date(raw);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${mm}-${dd} ${hh}:${mi}`;
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s || '';
-  return d.innerHTML;
-}
-
-function escAttr(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// ── Init: load from IndexedDB ──
-
-(async function init() {
-  try {
-    accounts = await dbGetAllBySeq();
-    accountSeq = accounts.length ? Math.max(...accounts.map(a => a.seq || 0)) : 0;
-    renderAccounts();
-  } catch (e) {
-    console.error('Failed to load from IndexedDB:', e);
-  }
-})();
+    return {
+      accounts,
+      activeAccountId,
+      activeEmailId,
+      importModalOpen,
+      actionsMenuOpen,
+      checkingAll,
+      loadingEmails,
+      emailError,
+      importText,
+      separatorInput,
+      importInputRef,
+      toast,
+      floatMenu,
+      activeAccount,
+      activeEmails,
+      activeEmail,
+      accountCountText,
+      hasInvalidAccounts,
+      emailsTitle,
+      toggleActionsMenu,
+      toggleFloatMenu,
+      openImportModal,
+      closeImportModal,
+      importAccounts,
+      removeAccount,
+      removeInvalidAccounts,
+      copyAccount,
+      checkAllAccounts,
+      exportCopy,
+      exportDownload,
+      selectAccount,
+      refreshEmails,
+      selectEmail,
+      accountStatusClass,
+      accountStatusText,
+      accountInitial,
+      accountDetail,
+      emailSender,
+      emailFrom,
+      recipientText,
+      isHtmlEmail,
+      formatDate,
+    };
+  },
+}).mount('#app');
 </script>
 </body>
 </html>
