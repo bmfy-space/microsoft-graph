@@ -190,5 +190,37 @@ def api_email():
     })
 
 
+@app.route("/api/check", methods=["POST"])
+def api_check():
+    data = request.get_json(silent=True) or {}
+
+    credentials = data.get("credentials", [])
+    if isinstance(credentials, str):
+        credentials = [credentials]
+    if not credentials:
+        return jsonify({"code": 400, "msg": "credentials is required"}), 400
+
+    separator = data.get("separator", "----")
+    results = []
+
+    for raw in credentials:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            creds = parse_credentials(raw, separator)
+        except ValueError:
+            results.append({"email": raw.split(separator)[0], "valid": False, "error": "Invalid format"})
+            continue
+
+        token = get_access_token(creds["client_id"], creds["refresh_token"])
+        if token:
+            results.append({"email": creds["email"], "valid": True})
+        else:
+            results.append({"email": creds["email"], "valid": False, "error": "Token refresh failed"})
+
+    return jsonify({"code": 200, "msg": "success", "data": results})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000, debug=True)

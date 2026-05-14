@@ -15,7 +15,7 @@
   .panel-header { height: 44px; padding: 0 16px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 13px; color: #666; background: #fafafa; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
   .panel-body { flex: 1; overflow-y: auto; min-height: 0; }
 
-  .panel-accounts { width: 260px; min-width: 260px; }
+  .panel-accounts { width: 300px; min-width: 300px; }
   .panel-emails { width: 360px; min-width: 320px; }
   .panel-content { flex: 1; min-width: 0; }
 
@@ -30,16 +30,28 @@
   .btn-icon:hover { background: #f0f0f0; }
 
   /* Account list */
-  .account-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background .1s; position: relative; }
+  .account-item { padding: 10px 40px 10px 16px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background .1s; position: relative; }
   .account-item:hover { background: #f8f9fa; }
   .account-item.active { background: #e8f0fe; border-left: 3px solid #4a90d9; padding-left: 13px; }
   .account-item .email { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .account-item .status { font-size: 11px; color: #999; margin-top: 2px; }
+  .account-item .status { font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .account-item .status.ok { color: #34a853; }
   .account-item .status.err { color: #ea4335; }
-  .account-item .remove-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; line-height: 1; display: none; }
-  .account-item:hover .remove-btn { display: block; }
-  .account-item .remove-btn:hover { color: #ea4335; }
+  .account-item .status.valid { color: #34a853; }
+  .account-item .status.invalid { color: #ea4335; }
+  .account-item .status.checking { color: #f9a825; }
+  .account-item .actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0; }
+  .account-item:hover .actions { opacity: 1; }
+  .account-item .actions-trigger { background: none; border: 1px solid transparent; cursor: pointer; padding: 2px 6px; border-radius: 4px; color: #aaa; font-size: 14px; line-height: 1; }
+  .account-item:hover .actions-trigger { border-color: #ddd; color: #888; }
+  .account-item .actions-trigger:hover { background: #eee; }
+
+  /* Global floating menu */
+  .float-menu { position: fixed; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 9999; min-width: 120px; overflow: hidden; }
+  .float-menu.hidden { display: none; }
+  .float-menu div { padding: 8px 14px; font-size: 12px; cursor: pointer; }
+  .float-menu div:hover { background: #f0f4fa; }
+  .float-menu .danger { color: #ea4335; }
   .account-count { font-size: 11px; color: #999; font-weight: 400; }
 
   /* Email list */
@@ -102,9 +114,11 @@
       <span>Accounts <span class="account-count" id="accountCount"></span></span>
       <div style="display:flex;gap:4px;position:relative">
         <button class="btn btn-sm btn-ghost" onclick="openImportModal()">Import</button>
-        <button class="btn btn-sm btn-ghost" onclick="toggleExportMenu(event)">Export</button>
-        <div class="export-menu hidden" id="exportMenu">
-          <div class="export-menu-item" onclick="exportCopy()">Copy to clipboard</div>
+        <button class="btn btn-sm btn-ghost" onclick="toggleActionsMenu(event)" id="actionsBtn">Actions</button>
+        <div class="export-menu hidden" id="actionsMenu">
+          <div class="export-menu-item" onclick="checkAllAccounts()">Check all</div>
+          <div class="export-menu-item hidden" id="clearInvalidItem" onclick="removeInvalidAccounts()">Clear invalid</div>
+          <div class="export-menu-item" onclick="exportCopy()">Copy all</div>
           <div class="export-menu-item" onclick="exportDownload()">Download .txt</div>
         </div>
       </div>
@@ -133,6 +147,12 @@
     </div>
   </div>
 
+</div>
+
+<!-- Floating item menu -->
+<div class="float-menu hidden" id="floatMenu">
+  <div id="floatMenuCopy">Copy</div>
+  <div class="danger" id="floatMenuRemove">Remove</div>
 </div>
 
 <!-- Import Modal -->
@@ -255,30 +275,31 @@ document.getElementById('importModal').addEventListener('click', function(e) {
 });
 
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeImportModal(); closeExportMenu(); }
+  if (e.key === 'Escape') { closeImportModal(); closeActionsMenu(); document.querySelectorAll('.item-menu.show').forEach(m => m.classList.remove('show')); }
 });
 
 document.addEventListener('click', function(e) {
-  if (!e.target.closest('.export-menu') && !e.target.closest('[onclick*="toggleExportMenu"]')) closeExportMenu();
+  if (!e.target.closest('#actionsMenu') && !e.target.closest('#actionsBtn')) closeActionsMenu();
+  if (!e.target.closest('.float-menu') && !e.target.closest('.actions-trigger')) closeFloatMenu();
 });
 
-// ── Export ──
+// ── Actions Menu ──
 
 function getExportText() {
   return accounts.map(a => a.raw).join('\n');
 }
 
-function toggleExportMenu(e) {
+function toggleActionsMenu(e) {
   e.stopPropagation();
-  document.getElementById('exportMenu').classList.toggle('hidden');
+  document.getElementById('actionsMenu').classList.toggle('hidden');
 }
 
-function closeExportMenu() {
-  document.getElementById('exportMenu').classList.add('hidden');
+function closeActionsMenu() {
+  document.getElementById('actionsMenu').classList.add('hidden');
 }
 
 async function exportCopy() {
-  closeExportMenu();
+  closeActionsMenu();
   if (!accounts.length) return;
   try {
     await navigator.clipboard.writeText(getExportText());
@@ -293,7 +314,7 @@ async function exportCopy() {
 }
 
 function exportDownload() {
-  closeExportMenu();
+  closeActionsMenu();
   if (!accounts.length) return;
   const blob = new Blob([getExportText()], { type: 'text/plain' });
   const a = document.createElement('a');
@@ -304,6 +325,40 @@ function exportDownload() {
 }
 
 // ── Accounts ──
+
+let floatMenuTarget = null;
+
+function openFloatMenu(id, btn) {
+  const menu = document.getElementById('floatMenu');
+  const rect = btn.getBoundingClientRect();
+  menu.style.left = rect.right - 120 + 'px';
+  menu.style.top = rect.bottom + 4 + 'px';
+  menu.classList.remove('hidden');
+  floatMenuTarget = id;
+  document.getElementById('floatMenuCopy').onclick = function(e) { e.stopPropagation(); copyAccount(floatMenuTarget, e); closeFloatMenu(); };
+  document.getElementById('floatMenuRemove').onclick = function(e) { e.stopPropagation(); removeAccount(floatMenuTarget, e); closeFloatMenu(); };
+}
+
+function closeFloatMenu() {
+  document.getElementById('floatMenu').classList.add('hidden');
+  floatMenuTarget = null;
+}
+
+function toggleItemMenu(id, e) {
+  e.stopPropagation();
+  const menu = document.getElementById('floatMenu');
+  if (!menu.classList.contains('hidden') && floatMenuTarget === id) { closeFloatMenu(); return; }
+  openFloatMenu(id, e.currentTarget);
+}
+
+function showItemMenu(id, btn) {
+  if (floatMenuTarget === id) return;
+  openFloatMenu(id, btn);
+}
+
+function hideItemMenu(id) {
+  closeFloatMenu();
+}
 
 async function importAccounts() {
   const raw = document.getElementById('importInput').value.trim();
@@ -341,21 +396,105 @@ async function removeAccount(id, e) {
   renderAccounts();
 }
 
+async function removeInvalidAccounts() {
+  closeActionsMenu();
+  const invalid = accounts.filter(a => a.checkStatus === 'invalid');
+  if (!invalid.length) return;
+  for (const a of invalid) {
+    await dbDelete('accounts', a.id);
+    await dbDelete('emails', a.id);
+  }
+  accounts = accounts.filter(a => a.checkStatus !== 'invalid');
+  if (activeAccountId && !accounts.some(a => a.id === activeAccountId)) {
+    activeAccountId = null;
+    activeEmailId = null;
+    document.getElementById('emailList').innerHTML = '<div class="empty">Select an account</div>';
+    document.getElementById('emailContent').innerHTML = '<div class="empty">Select an email</div>';
+    document.getElementById('emailsTitle').textContent = 'Emails';
+    document.getElementById('refreshBtn').style.display = 'none';
+  }
+  renderAccounts();
+}
+
+async function copyAccount(id, e) {
+  e.stopPropagation();
+  const acc = accounts.find(a => a.id === id);
+  if (!acc) return;
+  try {
+    await navigator.clipboard.writeText(acc.raw);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = acc.raw;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+async function checkAllAccounts() {
+  closeActionsMenu();
+  if (!accounts.length) return;
+  const btn = document.getElementById('actionsBtn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  // Set all to checking
+  accounts.forEach(a => { a.checkStatus = 'checking'; });
+  renderAccounts();
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        credentials: accounts.map(a => a.raw),
+        separator: accounts[0]?.separator || '----',
+      }),
+    });
+    const data = await resp.json();
+    if (data.code === 200 && data.data) {
+      for (const r of data.data) {
+        const acc = accounts.find(a => a.email === r.email);
+        if (acc) {
+          acc.checkStatus = r.valid ? 'valid' : 'invalid';
+          acc.checkError = r.error || '';
+          await dbPut('accounts', acc);
+        }
+      }
+    }
+  } catch {
+    accounts.forEach(a => { a.checkStatus = ''; });
+  }
+
+  renderAccounts();
+  btn.disabled = false;
+  btn.textContent = 'Actions';
+}
+
 function renderAccounts() {
   const el = document.getElementById('accountList');
   document.getElementById('accountCount').textContent = accounts.length ? `(${accounts.length})` : '';
+  const hasInvalid = accounts.some(a => a.checkStatus === 'invalid');
+  document.getElementById('clearInvalidItem').classList.toggle('hidden', !hasInvalid);
   if (!accounts.length) { el.innerHTML = '<div class="empty">No accounts</div>'; return; }
-  el.innerHTML = accounts.map(a => `
+  el.innerHTML = accounts.map(a => {
+    const statusClass = a.checkStatus === 'valid' ? 'valid' : a.checkStatus === 'invalid' ? 'invalid' : a.checkStatus === 'checking' ? 'checking' : '';
+    const statusText = a.checkStatus === 'valid' ? '✓ Valid' :
+                       a.checkStatus === 'invalid' ? `✗ ${a.checkError || 'Invalid'}` :
+                       a.checkStatus === 'checking' ? 'Checking...' :
+                       a.status === 'ok' ? `✓ ${a.emailCount ?? 0} emails` :
+                       a.status === 'err' ? '✗ Failed' :
+                       a.status === 'loading' ? 'Loading...' : '—';
+    return `
     <div class="account-item ${a.id === activeAccountId ? 'active' : ''}" onclick="selectAccount('${a.id}')">
       <div class="email" title="${a.email}">${a.email}</div>
-      <div class="status ${a.status === 'ok' ? 'ok' : a.status === 'err' ? 'err' : ''}">${
-        a.status === 'ok' ? `✓ ${a.emailCount ?? 0} emails` :
-        a.status === 'err' ? '✗ Failed' :
-        a.status === 'loading' ? 'Loading...' : '—'
-      }</div>
-      <button class="remove-btn" onclick="removeAccount('${a.id}', event)">&times;</button>
-    </div>
-  `).join('');
+      <div class="status ${statusClass}">${statusText}</div>
+      <div class="actions">
+        <button class="actions-trigger" data-acc="${a.id}" onclick="toggleItemMenu('${a.id}', event)" onmouseenter="showItemMenu('${a.id}', this)" title="Actions">···</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── Emails ──
