@@ -429,6 +429,36 @@
 
   .error-state strong { color: var(--color-danger); }
 
+  .mail-list-wrap {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sync-banner, .inline-error-banner {
+    min-height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .sync-banner {
+    border: 1px solid #bfdbfe;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+  }
+
+  .inline-error-banner {
+    border: 1px solid var(--color-danger-bg);
+    background: #fff7f7;
+    color: var(--color-danger);
+  }
+
   .spinner {
     width: 20px;
     height: 20px;
@@ -436,6 +466,13 @@
     border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin .7s linear infinite;
+  }
+
+  .spinner-small {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+    flex: 0 0 auto;
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -660,12 +697,12 @@
         <strong>Select an account</strong>
         <span>Choose an account from the left panel to view recent emails.</span>
       </div>
-      <div v-else-if="loadingEmails" class="loading-state">
+      <div v-else-if="initialEmailLoading" class="loading-state">
         <span class="spinner" aria-hidden="true"></span>
         <strong>Loading emails</strong>
         <span>Fetching the latest inbox and junk messages.</span>
       </div>
-      <div v-else-if="emailError" class="error-state">
+      <div v-else-if="emailError && !activeEmails.length" class="error-state">
         <strong>Unable to load emails</strong>
         <span>{{ emailError }}</span>
         <button class="btn btn-sm btn-primary" type="button" @click="refreshEmails">Try again</button>
@@ -674,7 +711,14 @@
         <strong>No emails</strong>
         <span>This account has no cached or fetched messages yet.</span>
       </div>
-      <div v-else class="list">
+      <div v-else class="mail-list-wrap">
+        <div v-if="loadingEmails" class="sync-banner" role="status" aria-live="polite">
+          <span class="spinner spinner-small" aria-hidden="true"></span>
+          <span>Refreshing emails… keeping the current list visible.</span>
+        </div>
+        <div v-if="emailError" class="inline-error-banner" role="alert">
+          <span>{{ emailError }}</span>
+        </div>
         <button v-for="email in activeEmails" :key="email.id" class="list-item email-item" :class="{ active: email.id === activeEmailId }" type="button" @click="selectEmail(email.id)">
           <span class="item-main">
             <span class="item-title" :title="email.subject">{{ email.subject || '(No subject)' }}</span>
@@ -853,8 +897,9 @@ createApp({
     const activeEmail = computed(() => activeEmails.value.find(email => email.id === activeEmailId.value) || null);
     const accountCountText = computed(() => accounts.value.length ? `${accounts.value.length} account${accounts.value.length === 1 ? '' : 's'}` : 'No accounts');
     const hasInvalidAccounts = computed(() => accounts.value.some(account => account.checkStatus === 'invalid'));
+    const initialEmailLoading = computed(() => loadingEmails.value && !activeEmails.value.length);
     const emailsTitle = computed(() => {
-      if (loadingEmails.value) return 'Loading';
+      if (initialEmailLoading.value) return 'Loading';
       if (!activeAccount.value) return 'Emails';
       return `Emails (${activeEmails.value.length || activeAccount.value.emailCount || 0})`;
     });
@@ -1084,8 +1129,7 @@ createApp({
         await dbPut('accounts', account);
         await dbPut('emails', { accountId: account.id, emails: account.emails });
       } catch (error) {
-        account.status = 'err';
-        account.emails = [];
+        account.status = account.emails?.length ? 'ok' : 'err';
         emailError.value = error.message || 'Email request failed';
         await dbPut('accounts', account);
       } finally {
@@ -1205,6 +1249,7 @@ createApp({
       activeEmail,
       accountCountText,
       hasInvalidAccounts,
+      initialEmailLoading,
       emailsTitle,
       toggleActionsMenu,
       toggleFloatMenu,
