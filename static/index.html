@@ -65,7 +65,7 @@
 
   .panel:last-child { border-right: none; }
 
-  .panel-accounts { width: 300px; min-width: 300px; }
+  .panel-accounts,
   .panel-emails { width: 360px; min-width: 320px; }
   .panel-content { flex: 1; min-width: 0; }
 
@@ -142,10 +142,12 @@
   .btn:hover:not(:disabled) { background: #eef2f7; }
   .btn:active:not(:disabled) { transform: translateY(1px); }
   .btn:disabled { opacity: .48; cursor: not-allowed; }
-  .btn:focus-visible, .icon-btn:focus-visible, .menu-item:focus-visible, .list-item:focus-visible, input:focus-visible, textarea:focus-visible, .modal-close:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+  .btn:focus-visible, .icon-btn:focus-visible, .menu-item:focus-visible, .list-item:focus-visible, input:focus-visible, textarea:focus-visible, .modal-close:focus-visible, .custom-select-trigger:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
 
   .btn-primary { background: var(--color-primary); color: #fff; }
   .btn-primary:hover:not(:disabled) { background: var(--color-primary-strong); }
+  .btn-danger { background: var(--color-danger); color: #fff; }
+  .btn-danger:hover:not(:disabled) { background: #b91c1c; }
   .btn-ghost { border-color: var(--color-border); background: #fff; color: #334155; }
   .btn-ghost:hover:not(:disabled) { border-color: var(--color-border-strong); background: #f8fafc; }
   .btn-sm { min-height: 32px; padding: 0 12px; font-size: 12px; }
@@ -191,7 +193,7 @@
   .list-item.active::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 999px; background: var(--color-primary); }
 
   .account-item {
-    min-height: 82px;
+    min-height: 92px;
     padding: 12px;
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) 36px;
@@ -199,6 +201,204 @@
     gap: 10px;
     background: rgba(255, 255, 255, .72);
     border-color: rgba(219, 228, 240, .72);
+  }
+
+  .panel-accounts .panel-header { padding: 0 10px; gap: 8px; }
+  .panel-accounts .panel-actions { gap: 6px; }
+  .panel-accounts .btn-sm { padding: 0 8px; }
+
+  .category-filter-panel {
+    padding: 10px;
+    border-bottom: 1px solid var(--color-border);
+    background: rgba(248, 250, 252, .72);
+    flex-shrink: 0;
+  }
+
+  .category-create-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .mini-btn {
+    min-height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-muted);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .mini-btn:hover { border-color: var(--color-border-strong); color: var(--color-foreground); }
+  .mini-btn:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+  .mini-btn.danger { color: var(--color-danger); }
+
+  .category-filter-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .category-filter-dropdown {
+    position: relative;
+    min-width: 0;
+  }
+
+  .category-filter-trigger {
+    width: 100%;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--color-foreground);
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 10px;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .category-filter-trigger:hover,
+  .category-filter-trigger.open {
+    border-color: #bfdbfe;
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .08);
+  }
+
+  .category-filter-trigger:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+
+  .category-filter-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .category-filter-count {
+    min-width: 24px;
+    min-height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-strong);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .category-filter-chevron {
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--color-muted);
+    border-bottom: 2px solid var(--color-muted);
+    transform: rotate(45deg) translateY(-2px);
+    transform-origin: center;
+    transition: transform var(--transition), border-color var(--transition);
+  }
+
+  .category-filter-trigger:hover .category-filter-chevron,
+  .category-filter-trigger.open .category-filter-chevron { border-color: var(--color-primary-strong); }
+  .category-filter-trigger.open .category-filter-chevron { transform: rotate(225deg) translate(-2px, -1px); }
+
+  .category-filter-menu {
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    max-height: min(320px, calc(100dvh - 180px));
+    overflow: auto;
+  }
+
+  .category-manager-modal { width: 620px; }
+
+  .category-manager-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .category-manager-row {
+    min-height: 52px;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-surface-muted);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .category-manager-row.deleting { background: #fff7f7; border-color: #fecaca; }
+
+  .category-manager-main {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+
+  .category-manager-main strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-foreground);
+    font-size: 13px;
+  }
+
+  .category-manager-main span {
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+
+  .category-manager-input {
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 12px;
+    outline: none;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .category-manager-input:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+
+  .category-manager-actions,
+  .category-delete-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .category-delete-confirm {
+    grid-column: 1 / -1;
+    padding-top: 8px;
+    border-top: 1px solid #fecaca;
+    color: var(--color-danger);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .system-pill {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
   }
 
   .account-item:hover { border-color: var(--color-border-strong); }
@@ -239,6 +439,48 @@
   }
 
   .account-meta {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .account-category-row {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .category-pill-list {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .category-pill {
+    max-width: 92px;
+    padding: 3px 7px;
+    border: none;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 750;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 0 auto;
+  }
+
+  .category-more-pill {
+    background: #f1f5f9;
+    color: var(--color-muted);
+  }
+
+  .account-state-row {
     min-width: 0;
     display: flex;
     align-items: center;
@@ -387,7 +629,46 @@
     z-index: 1200;
   }
 
-  .float-menu { position: fixed; z-index: 1000; }
+  .float-menu,
+  .category-menu {
+    position: fixed;
+    z-index: 1000;
+  }
+
+  .category-menu {
+    min-width: 220px;
+    max-width: 280px;
+    max-height: min(360px, calc(100dvh - 20px));
+    overflow: auto;
+  }
+
+  .menu-title {
+    padding: 4px 10px 8px;
+    color: var(--color-muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .menu-empty {
+    padding: 8px 10px 4px;
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+
+  .category-menu-search {
+    width: 100%;
+    min-height: 34px;
+    margin: 0 0 6px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    outline: none;
+    font-size: 12px;
+  }
+
+  .category-menu-search:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
 
   .menu-item {
     width: 100%;
@@ -409,8 +690,103 @@
   }
 
   .menu-item:hover { background: var(--color-surface-muted); }
+  .menu-item.selected { background: var(--color-primary-soft); color: var(--color-primary-strong); }
   .menu-item.danger { color: var(--color-danger); }
   .menu-item:disabled { opacity: .48; cursor: not-allowed; }
+
+  .custom-select-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .custom-select {
+    position: relative;
+    min-width: 0;
+  }
+
+  .custom-select-trigger {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--color-foreground);
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 10px;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    font-family: "SF Mono", Consolas, ui-monospace, monospace;
+    font-size: 12px;
+    transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  }
+
+  .custom-select-trigger:hover,
+  .custom-select-trigger.open {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+  }
+
+  .custom-select-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .custom-select-chevron {
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--color-muted);
+    border-bottom: 2px solid var(--color-muted);
+    transform: rotate(45deg) translateY(-2px);
+    transform-origin: center;
+    transition: transform var(--transition), border-color var(--transition);
+  }
+
+  .custom-select-trigger.open .custom-select-chevron { transform: rotate(225deg) translate(-2px, -1px); border-color: var(--color-primary-strong); }
+
+  .custom-select-menu {
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    max-height: 240px;
+    overflow: auto;
+  }
+
+  .custom-select-add {
+    min-height: 42px;
+    white-space: nowrap;
+  }
+
+  .multi-category-menu {
+    min-width: 240px;
+    max-width: 300px;
+  }
+
+  .menu-item-check {
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    color: #fff;
+    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    flex: 0 0 auto;
+  }
+
+  .menu-item.selected .menu-item-check {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+  }
 
   .empty, .loading-state, .error-state {
     min-height: 100%;
@@ -434,6 +810,7 @@
     gap: 8px;
     padding: 10px;
   }
+
 
   .sync-banner, .inline-error-banner {
     min-height: 38px;
@@ -532,6 +909,110 @@
     flex-direction: column;
   }
 
+  .category-delete-overlay { z-index: 980; }
+  .category-delete-modal { width: 460px; }
+  .account-dialog-modal { width: 560px; }
+
+  .account-dialog-summary {
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-surface-muted);
+    display: grid;
+    gap: 8px;
+  }
+
+  .account-dialog-email {
+    min-width: 0;
+    color: var(--color-foreground);
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.35;
+    word-break: break-all;
+  }
+
+  .account-dialog-summary .category-pill-list {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .account-detail-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .account-detail-row {
+    min-height: 38px;
+    padding: 9px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: #fff;
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .account-detail-row span:first-child {
+    color: var(--color-muted);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .account-detail-row span:last-child {
+    min-width: 0;
+    color: var(--color-foreground);
+    font-size: 12px;
+    line-height: 1.45;
+    word-break: break-all;
+  }
+
+  .category-checkbox-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .category-checkbox-item {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--color-foreground);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 750;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+  }
+
+  .category-checkbox-item:hover { border-color: #bfdbfe; background: var(--color-primary-soft); }
+  .category-checkbox-item.selected { border-color: #bfdbfe; background: var(--color-primary-soft); color: var(--color-primary-strong); }
+  .category-checkbox-item.selected .menu-item-check { border-color: var(--color-primary); background: var(--color-primary); }
+  .category-checkbox-item:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
+
+  .delete-summary {
+    padding: 2px 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .delete-summary strong {
+    color: var(--color-foreground);
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .delete-summary span {
+    color: var(--color-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
   .modal-header {
     min-height: 60px;
     padding: 0 18px 0 22px;
@@ -568,7 +1049,7 @@
 
   .field { display: grid; gap: 7px; }
   .field label { color: #334155; font-size: 12px; font-weight: 750; }
-  .field input, .field textarea {
+  .field input, .field textarea, .field select {
     width: 100%;
     border: 1px solid var(--color-border-strong);
     border-radius: 14px;
@@ -578,9 +1059,9 @@
     transition: border-color var(--transition), box-shadow var(--transition);
   }
 
-  .field input { min-height: 42px; padding: 0 12px; font-family: "SF Mono", Consolas, ui-monospace, monospace; font-size: 12px; }
+  .field input, .field select { min-height: 42px; padding: 0 12px; font-family: "SF Mono", Consolas, ui-monospace, monospace; font-size: 12px; }
   .field textarea { min-height: 180px; padding: 12px; resize: vertical; font-family: "SF Mono", Consolas, ui-monospace, monospace; font-size: 12px; line-height: 1.55; }
-  .field input:focus, .field textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, .12); }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, .12); }
   .field-hint { color: var(--color-muted); font-size: 12px; line-height: 1.5; }
 
   .modal-footer {
@@ -616,7 +1097,7 @@
   .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(4px); }
 
   @media (max-width: 900px) {
-    .panel-accounts { width: 260px; min-width: 260px; }
+    .panel-accounts,
     .panel-emails { width: 320px; min-width: 300px; }
     .panel-header { padding: 0 12px; }
   }
@@ -645,7 +1126,7 @@
           {{ checkingAll ? 'Checking' : 'Actions' }}
         </button>
         <transition name="fade">
-          <div v-if="actionsMenuOpen" class="menu" style="right:0;top:38px" @click.stop>
+          <div v-if="actionsMenuOpen" class="menu" style="right:0;top:42px" @click.stop>
             <button class="menu-item" type="button" :disabled="checkingAll || !accounts.length" @click="checkAllAccounts">Check all</button>
             <button v-if="hasInvalidAccounts" class="menu-item danger" type="button" @click="removeInvalidAccounts">Clear invalid</button>
             <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportCopy">Copy all</button>
@@ -655,21 +1136,58 @@
       </div>
     </header>
 
+    <div v-if="accounts.length" class="category-filter-panel" aria-label="Category filters">
+      <div class="category-filter-row">
+        <div class="category-filter-dropdown" @click.stop>
+          <button class="category-filter-trigger" type="button" :class="{ open: categoryFilterOpen }" :aria-expanded="categoryFilterOpen" aria-haspopup="listbox" @click.stop="toggleCategoryFilter">
+            <span class="category-filter-label">{{ selectedCategoryLabel }}</span>
+            <span class="category-filter-count">{{ selectedCategoryCount }}</span>
+            <span class="category-filter-chevron" aria-hidden="true"></span>
+          </button>
+          <transition name="fade">
+            <div v-if="categoryFilterOpen" class="menu category-filter-menu" role="listbox" @click.stop>
+              <button class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategory === 'all'" :class="{ selected: selectedCategory === 'all' }" @click="selectCategory('all')">
+                <span>All</span>
+                <span>{{ accounts.length }}</span>
+              </button>
+              <button v-for="category in categories" :key="category" class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategory === category" :class="{ selected: selectedCategory === category }" @click="selectCategory(category)">
+                <span>{{ category }}</span>
+                <span>{{ categoryCount(category) }}</span>
+              </button>
+            </div>
+          </transition>
+        </div>
+        <button class="btn btn-sm btn-ghost" type="button" @click="openCategoryManager">Manage</button>
+      </div>
+    </div>
+
     <div class="panel-body">
       <div v-if="!accounts.length" class="empty">
         <strong>No accounts yet</strong>
         <span>Import credentials to load mail from Microsoft Graph.</span>
       </div>
+      <div v-else-if="!filteredAccounts.length" class="empty">
+        <strong>No accounts in this category</strong>
+        <span>Choose another category or import accounts into {{ selectedCategory }}.</span>
+      </div>
       <div v-else class="list">
-        <div v-for="account in accounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
+        <div v-for="account in filteredAccounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
           <span class="account-avatar" :class="accountStatusClass(account)" aria-hidden="true">{{ accountInitial(account) }}</span>
           <span class="account-content">
             <span class="account-email" :title="account.email">{{ account.email }}</span>
             <span class="account-meta">
-              <span class="status-pill account-status" :class="accountStatusClass(account)">{{ accountStatusText(account) }}</span>
-              <span class="account-detail" :title="accountDetail(account)">
-                <span class="status-dot" :class="accountStatusClass(account)" aria-hidden="true"></span>
-                <span>{{ accountDetail(account) }}</span>
+              <span class="account-category-row">
+                <span class="category-pill-list" :title="accountCategoryLabel(account)">
+                  <span v-for="category in visibleAccountCategories(account)" :key="category" class="category-pill">{{ category }}</span>
+                  <span v-if="hiddenAccountCategoryCount(account)" class="category-pill category-more-pill">+{{ hiddenAccountCategoryCount(account) }}</span>
+                </span>
+              </span>
+              <span class="account-state-row">
+                <span class="status-pill account-status" :class="accountStatusClass(account)">{{ accountStatusText(account) }}</span>
+                <span class="account-detail" :title="accountDetail(account)">
+                  <span class="status-dot" :class="accountStatusClass(account)" aria-hidden="true"></span>
+                  <span>{{ accountDetail(account) }}</span>
+                </span>
               </span>
             </span>
           </span>
@@ -700,7 +1218,7 @@
       <div v-else-if="initialEmailLoading" class="loading-state">
         <span class="spinner" aria-hidden="true"></span>
         <strong>Loading emails</strong>
-        <span>Fetching the latest inbox and junk messages.</span>
+        <span>Fetching the latest messages.</span>
       </div>
       <div v-else-if="emailError && !activeEmails.length" class="error-state">
         <strong>Unable to load emails</strong>
@@ -766,8 +1284,174 @@
 
   <transition name="fade">
     <div v-if="floatMenu.open" class="menu float-menu" :style="{ left: floatMenu.left + 'px', top: floatMenu.top + 'px' }" @click.stop>
+      <button class="menu-item" type="button" @click="openAccountDetailDialog(floatMenu.accountId)">Details</button>
+      <button class="menu-item" type="button" @click="openAccountCategoryDialog(floatMenu.accountId)">Categories</button>
       <button class="menu-item" type="button" @click="copyAccount(floatMenu.accountId)">Copy</button>
       <button class="menu-item danger" type="button" @click="removeAccount(floatMenu.accountId)">Remove</button>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="accountCategoryDialogOpen && dialogAccount" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="account-category-title" @click.self="closeAccountCategoryDialog">
+      <div class="modal account-dialog-modal">
+        <div class="modal-header">
+          <div>
+            <strong id="account-category-title">Edit account categories</strong>
+            <span>{{ dialogAccount.email }}</span>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close account category dialog" @click="closeAccountCategoryDialog">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="account-dialog-summary">
+            <div class="account-dialog-email">{{ dialogAccount.email }}</div>
+            <div class="field-hint">Select one or more categories for this account.</div>
+          </div>
+          <div class="category-checkbox-list">
+            <button v-for="category in categories" :key="category" class="category-checkbox-item" type="button" :class="{ selected: accountCategoryDraft.includes(category) }" :aria-pressed="accountCategoryDraft.includes(category)" @click="toggleAccountCategoryDraft(category)">
+              <span>{{ category }}</span>
+              <span class="menu-item-check" aria-hidden="true">{{ accountCategoryDraft.includes(category) ? '✓' : '' }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="closeAccountCategoryDialog">Cancel</button>
+          <button class="btn btn-primary" type="button" @click="saveAccountCategoryDialog">Save</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="accountDetailDialogOpen && dialogAccount" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="account-detail-title" @click.self="closeAccountDetailDialog">
+      <div class="modal account-dialog-modal">
+        <div class="modal-header">
+          <div>
+            <strong id="account-detail-title">Account details</strong>
+            <span>{{ dialogAccount.email }}</span>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close account detail dialog" @click="closeAccountDetailDialog">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="account-dialog-summary">
+            <div class="account-dialog-email">{{ dialogAccount.email }}</div>
+            <div class="category-pill-list" :title="accountCategoryLabel(dialogAccount)">
+              <span v-for="category in accountCategories(dialogAccount)" :key="category" class="category-pill">{{ category }}</span>
+            </div>
+          </div>
+          <div class="account-detail-grid">
+            <div class="account-detail-row">
+              <span>Email</span>
+              <span>{{ dialogAccount.email }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Status</span>
+              <span>{{ accountStatusText(dialogAccount) }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Detail</span>
+              <span>{{ accountDetail(dialogAccount) }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Categories</span>
+              <span>{{ accountCategoryLabel(dialogAccount) }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Separator</span>
+              <span>{{ dialogAccount.separator || '----' }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Email count</span>
+              <span>{{ dialogAccount.emailCount ?? (dialogAccount.emails?.length || 0) }}</span>
+            </div>
+            <div class="account-detail-row">
+              <span>Credential</span>
+              <span>{{ dialogAccount.raw }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="openAccountCategoryDialog(dialogAccount.id)">Edit categories</button>
+          <button class="btn btn-primary" type="button" @click="closeAccountDetailDialog">Close</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="categoryManagerOpen" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="category-manager-title" @click.self="closeCategoryManager">
+      <form class="modal category-manager-modal" @submit.prevent="createManagedCategory">
+        <div class="modal-header">
+          <div>
+            <strong id="category-manager-title">Manage categories</strong>
+            <span>Create, rename, or remove account categories.</span>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close category dialog" @click="closeCategoryManager">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label for="newManagedCategoryInput">New category</label>
+            <div class="category-create-row">
+              <input id="newManagedCategoryInput" v-model="newManagedCategoryName" autocomplete="off" placeholder="Category name" @keydown.enter.prevent="createManagedCategory">
+              <button class="btn btn-sm btn-primary" type="button" @click="createManagedCategory">Create</button>
+            </div>
+            <div class="field-hint">New categories become available for import and per-account moves immediately.</div>
+          </div>
+          <div v-if="categoryManagerError" class="inline-error-banner" role="alert">
+            <span>{{ categoryManagerError }}</span>
+          </div>
+          <div class="category-manager-list">
+            <div v-for="category in categories" :key="category" class="category-manager-row" :class="{ editing: editingCategoryName === category }">
+              <template v-if="editingCategoryName === category">
+                <div class="category-manager-main">
+                  <input class="category-manager-input" v-model="editingCategoryDraft" autocomplete="off" @keydown.enter.prevent="saveRenameCategory(category)" @keydown.esc.prevent="cancelRenameCategory">
+                </div>
+                <div class="category-manager-actions">
+                  <button class="mini-btn" type="button" @click="saveRenameCategory(category)">Save</button>
+                  <button class="mini-btn" type="button" @click="cancelRenameCategory">Cancel</button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="category-manager-main">
+                  <strong>{{ category }}</strong>
+                  <span>{{ categoryCount(category) }} accounts</span>
+                </div>
+                <div class="category-manager-actions">
+                  <span v-if="category === 'Default'" class="system-pill">System</span>
+                  <button v-else class="mini-btn" type="button" @click="startRenameCategory(category)">Rename</button>
+                  <button v-if="category !== 'Default'" class="mini-btn danger" type="button" @click="requestDeleteCategory(category)">Delete</button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="closeCategoryManager">Close</button>
+        </div>
+      </form>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="deletingCategoryName" class="modal-overlay category-delete-overlay" role="dialog" aria-modal="true" aria-labelledby="category-delete-title" @click.self="cancelDeleteCategory">
+      <div class="modal category-delete-modal">
+        <div class="modal-header">
+          <div>
+            <strong id="category-delete-title">Delete category</strong>
+            <span>Remove this category from matching accounts.</span>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close delete dialog" @click="cancelDeleteCategory">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="delete-summary">
+            <strong>Delete “{{ deletingCategoryName }}”?</strong>
+            <span>{{ categoryCount(deletingCategoryName) }} account{{ categoryCount(deletingCategoryName) === 1 ? '' : 's' }} will be updated.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="cancelDeleteCategory">Cancel</button>
+          <button class="btn btn-danger" type="button" @click="confirmDeleteCategory(deletingCategoryName)">Delete</button>
+        </div>
+      </div>
     </div>
   </transition>
 
@@ -786,6 +1470,32 @@
             <label for="separatorInput">Separator</label>
             <input id="separatorInput" v-model="separatorInput" autocomplete="off" spellcheck="false">
             <div class="field-hint">Default format: email----password----clientId----refreshToken</div>
+          </div>
+          <div class="field">
+            <label id="importCategoryLabel">Assign category</label>
+            <div class="custom-select-row">
+              <div class="custom-select" @click.stop>
+                <button class="custom-select-trigger" type="button" :class="{ open: importCategoryDropdownOpen }" aria-labelledby="importCategoryLabel" aria-haspopup="listbox" :aria-expanded="importCategoryDropdownOpen" @click.stop="toggleImportCategoryDropdown">
+                  <span class="custom-select-value">{{ importCategory }}</span>
+                  <span class="custom-select-chevron" aria-hidden="true"></span>
+                </button>
+                <transition name="fade">
+                  <div v-if="importCategoryDropdownOpen" class="menu custom-select-menu" role="listbox" @click.stop>
+                    <button v-for="category in categories" :key="category" class="menu-item" type="button" role="option" :aria-selected="importCategory === category" :class="{ selected: importCategory === category }" @click="selectImportCategory(category)">
+                      <span>{{ category }}</span>
+                      <span v-if="importCategory === category">✓</span>
+                    </button>
+                  </div>
+                </transition>
+              </div>
+              <button class="btn btn-sm btn-ghost custom-select-add" type="button" @click="toggleImportNewCategory">{{ importCategoryMode === 'new' ? 'Use existing' : 'Create new category' }}</button>
+            </div>
+            <div class="field-hint">Imported accounts will be placed in this category.</div>
+          </div>
+          <div v-if="importCategoryMode === 'new'" class="field">
+            <label for="newCategoryInput">New category</label>
+            <input id="newCategoryInput" v-model="importNewCategoryName" autocomplete="off" placeholder="Category name">
+            <div class="field-hint">This category will be created before importing.</div>
           </div>
           <div class="field">
             <label for="importInput">Credentials</label>
@@ -809,7 +1519,7 @@
 <script>
 const API_BASE = window.location.origin;
 const DB_NAME = 'GraphMail';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -827,6 +1537,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('emails')) {
         db.createObjectStore('emails', { keyPath: 'accountId' });
+      }
+      if (!db.objectStoreNames.contains('categories')) {
+        db.createObjectStore('categories', { keyPath: 'name' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -872,31 +1585,82 @@ function dbGet(store, key) {
   }));
 }
 
+function dbGetAll(store) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
 const { createApp, ref, computed, onMounted, onBeforeUnmount, nextTick } = Vue;
 
 createApp({
   setup() {
     const accounts = ref([]);
+    const storedCategories = ref(['Default']);
     const activeAccountId = ref(null);
     const activeEmailId = ref(null);
     const accountSeq = ref(0);
     const importModalOpen = ref(false);
+    const categoryManagerOpen = ref(false);
+    const accountCategoryDialogOpen = ref(false);
+    const accountDetailDialogOpen = ref(false);
+    const dialogAccountId = ref(null);
+    const accountCategoryDraft = ref([]);
     const actionsMenuOpen = ref(false);
+    const categoryFilterOpen = ref(false);
     const checkingAll = ref(false);
     const loadingEmails = ref(false);
     const emailError = ref('');
     const importText = ref('');
     const separatorInput = ref('----');
+    const selectedCategory = ref('all');
+    const importCategory = ref('Default');
+    const importCategoryMode = ref('existing');
+    const importCategoryDropdownOpen = ref(false);
+    const importNewCategoryName = ref('');
+    const newManagedCategoryName = ref('');
+    const editingCategoryName = ref('');
+    const editingCategoryDraft = ref('');
+    const deletingCategoryName = ref('');
+    const categoryManagerError = ref('');
     const importInputRef = ref(null);
     const toast = ref('');
     const toastTimer = ref(null);
     const floatMenu = ref({ open: false, accountId: null, left: 0, top: 0 });
 
+    const categories = computed(() => {
+      const names = new Set(['Default', ...storedCategories.value]);
+      accounts.value.forEach(account => (account.categories || normalizeLegacyCategories(account)).forEach(category => names.add(category)));
+      return Array.from(names).sort((a, b) => {
+        if (a === 'Default') return -1;
+        if (b === 'Default') return 1;
+        return a.localeCompare(b);
+      });
+    });
+    const categoryCounts = computed(() => {
+      const counts = new Map();
+      categories.value.forEach(name => counts.set(name, 0));
+      accounts.value.forEach(account => {
+        (account.categories || normalizeLegacyCategories(account)).forEach(category => {
+          counts.set(category, (counts.get(category) || 0) + 1);
+        });
+      });
+      return counts;
+    });
+    const dialogAccount = computed(() => accounts.value.find(account => account.id === dialogAccountId.value) || null);
+    const filteredAccounts = computed(() => selectedCategory.value === 'all'
+      ? accounts.value
+      : accounts.value.filter(account => normalizeLegacyCategories(account).includes(selectedCategory.value)));
     const activeAccount = computed(() => accounts.value.find(account => account.id === activeAccountId.value) || null);
     const activeEmails = computed(() => activeAccount.value?.emails || []);
     const activeEmail = computed(() => activeEmails.value.find(email => email.id === activeEmailId.value) || null);
-    const accountCountText = computed(() => accounts.value.length ? `${accounts.value.length} account${accounts.value.length === 1 ? '' : 's'}` : 'No accounts');
-    const hasInvalidAccounts = computed(() => accounts.value.some(account => account.checkStatus === 'invalid'));
+    const accountCountText = computed(() => filteredAccounts.value.length ? `${filteredAccounts.value.length} visible · ${accounts.value.length} total` : 'No accounts in filter');
+    const selectedCategoryLabel = computed(() => selectedCategory.value === 'all' ? 'All' : selectedCategory.value);
+    const selectedCategoryCount = computed(() => selectedCategory.value === 'all' ? accounts.value.length : categoryCount(selectedCategory.value));
+    const hasInvalidAccounts = computed(() => filteredAccounts.value.some(account => account.checkStatus === 'invalid'));
     const initialEmailLoading = computed(() => loadingEmails.value && !activeEmails.value.length);
     const emailsTitle = computed(() => {
       if (initialEmailLoading.value) return 'Loading';
@@ -914,11 +1678,43 @@ createApp({
       actionsMenuOpen.value = false;
     }
 
+    function closeCategoryFilter() {
+      categoryFilterOpen.value = false;
+    }
+
     function closeFloatMenu() {
       floatMenu.value = { open: false, accountId: null, left: 0, top: 0 };
     }
 
+    function closeAccountCategoryDialog() {
+      accountCategoryDialogOpen.value = false;
+      accountCategoryDraft.value = [];
+      if (!accountDetailDialogOpen.value) dialogAccountId.value = null;
+    }
+
+    function closeAccountDetailDialog() {
+      accountDetailDialogOpen.value = false;
+      if (!accountCategoryDialogOpen.value) dialogAccountId.value = null;
+    }
+
+    function closeCategoryManager() {
+      categoryManagerOpen.value = false;
+      newManagedCategoryName.value = '';
+      editingCategoryName.value = '';
+      editingCategoryDraft.value = '';
+      deletingCategoryName.value = '';
+      categoryManagerError.value = '';
+    }
+
     function closeOverlays() {
+      closeActionsMenu();
+      closeCategoryFilter();
+      closeFloatMenu();
+      closeImportCategoryDropdown();
+    }
+
+    function toggleCategoryFilter() {
+      categoryFilterOpen.value = !categoryFilterOpen.value;
       closeActionsMenu();
       closeFloatMenu();
     }
@@ -926,6 +1722,7 @@ createApp({
     function toggleActionsMenu() {
       if (!accounts.value.length || checkingAll.value) return;
       actionsMenuOpen.value = !actionsMenuOpen.value;
+      closeCategoryFilter();
       closeFloatMenu();
     }
 
@@ -943,10 +1740,12 @@ createApp({
         top: rect.bottom + 6,
       };
       closeActionsMenu();
+      closeCategoryFilter();
     }
 
     function openImportModal() {
       closeOverlays();
+      closeCategoryManager();
       importModalOpen.value = true;
       nextTick(() => importInputRef.value?.focus());
     }
@@ -954,10 +1753,236 @@ createApp({
     function closeImportModal() {
       importModalOpen.value = false;
       importText.value = '';
+      importCategoryMode.value = 'existing';
+      importCategoryDropdownOpen.value = false;
+      importNewCategoryName.value = '';
+    }
+
+    function toggleImportCategoryDropdown() {
+      importCategoryDropdownOpen.value = !importCategoryDropdownOpen.value;
+      closeActionsMenu();
+      closeCategoryFilter();
+      closeFloatMenu();
+    }
+
+    function closeImportCategoryDropdown() {
+      importCategoryDropdownOpen.value = false;
+    }
+
+    function selectImportCategory(category) {
+      importCategory.value = category;
+      importCategoryMode.value = 'existing';
+      closeImportCategoryDropdown();
+    }
+
+    function toggleImportNewCategory() {
+      importCategoryMode.value = importCategoryMode.value === 'new' ? 'existing' : 'new';
+      if (importCategoryMode.value === 'new') closeImportCategoryDropdown();
+    }
+
+    function openCategoryManager() {
+      closeOverlays();
+      closeAccountCategoryDialog();
+      closeAccountDetailDialog();
+      categoryManagerOpen.value = true;
+      categoryManagerError.value = '';
+    }
+
+    function normalizeCategoryName(name) {
+      return (name || '').trim() || 'Default';
+    }
+
+    function normalizeLegacyCategories(account) {
+      if (!account) return ['Default'];
+      const legacy = normalizeCategoryName(account.category);
+      const list = Array.isArray(account.categories) && account.categories.length ? account.categories : [legacy];
+      const normalized = Array.from(new Set(list.map(normalizeCategoryName).filter(Boolean)));
+      return normalized.length ? normalized : ['Default'];
+    }
+
+    function persistAccountCategories(account) {
+      account.categories = normalizeLegacyCategories(account);
+      account.category = account.categories[0] || 'Default';
+    }
+
+    function getImportCategoryName() {
+      return normalizeCategoryName(importCategoryMode.value === 'new' ? importNewCategoryName.value : importCategory.value);
+    }
+
+    async function persistCategory(category) {
+      const name = normalizeCategoryName(category);
+      if (!storedCategories.value.includes(name)) {
+        storedCategories.value.push(name);
+      }
+      await dbPut('categories', { name });
+      return name;
+    }
+
+    function accountHasCategory(account, category) {
+      return normalizeLegacyCategories(account).includes(category);
+    }
+
+    function visibleAccountCategories(account) {
+      return normalizeLegacyCategories(account).slice(0, 2);
+    }
+
+    function hiddenAccountCategoryCount(account) {
+      return Math.max(0, normalizeLegacyCategories(account).length - 2);
+    }
+
+    function accountCategories(account) {
+      return normalizeLegacyCategories(account);
+    }
+
+    function accountCategoryLabel(account) {
+      return normalizeLegacyCategories(account).join(' · ');
+    }
+
+    function openAccountCategoryDialog(accountId) {
+      const account = accounts.value.find(item => item.id === accountId);
+      if (!account) return;
+      closeFloatMenu();
+      accountDetailDialogOpen.value = false;
+      dialogAccountId.value = accountId;
+      accountCategoryDraft.value = normalizeLegacyCategories(account);
+      accountCategoryDialogOpen.value = true;
+    }
+
+    function openAccountDetailDialog(accountId) {
+      const account = accounts.value.find(item => item.id === accountId);
+      if (!account) return;
+      closeFloatMenu();
+      closeAccountCategoryDialog();
+      dialogAccountId.value = accountId;
+      accountDetailDialogOpen.value = true;
+    }
+
+    function toggleAccountCategoryDraft(category) {
+      accountCategoryDraft.value = accountCategoryDraft.value.includes(category)
+        ? accountCategoryDraft.value.filter(item => item !== category)
+        : [...accountCategoryDraft.value, category];
+      if (!accountCategoryDraft.value.length) accountCategoryDraft.value = ['Default'];
+    }
+
+    async function saveAccountCategoryDialog() {
+      const account = dialogAccount.value;
+      if (!account) return;
+      account.categories = accountCategoryDraft.value.length ? [...accountCategoryDraft.value] : ['Default'];
+      persistAccountCategories(account);
+      await dbPut('accounts', account);
+      if (selectedCategory.value !== 'all' && !accountHasCategory(account, selectedCategory.value)) {
+        activeAccountId.value = null;
+        activeEmailId.value = null;
+        emailError.value = '';
+      }
+      showToast(`${account.email} categories updated`);
+      closeAccountCategoryDialog();
+    }
+
+    async function removeStoredCategory(category) {
+      storedCategories.value = storedCategories.value.filter(name => name !== category);
+      await dbDelete('categories', category);
+    }
+
+    function selectCategory(category) {
+      selectedCategory.value = category;
+      closeOverlays();
+      if (activeAccountId.value && !filteredAccounts.value.some(account => account.id === activeAccountId.value)) {
+        activeAccountId.value = null;
+        activeEmailId.value = null;
+        emailError.value = '';
+      }
+    }
+
+
+    async function createManagedCategory() {
+      const category = normalizeCategoryName(newManagedCategoryName.value);
+      categoryManagerError.value = '';
+      if (!newManagedCategoryName.value.trim()) {
+        categoryManagerError.value = 'Category name is required';
+        return;
+      }
+      if (categories.value.includes(category)) {
+        categoryManagerError.value = 'Category already exists';
+        return;
+      }
+      await persistCategory(category);
+      newManagedCategoryName.value = '';
+      showToast(`Category ${category} created`);
+    }
+
+    function startRenameCategory(category) {
+      deletingCategoryName.value = '';
+      editingCategoryName.value = category;
+      editingCategoryDraft.value = category;
+      categoryManagerError.value = '';
+    }
+
+    function cancelRenameCategory() {
+      editingCategoryName.value = '';
+      editingCategoryDraft.value = '';
+      categoryManagerError.value = '';
+    }
+
+    async function saveRenameCategory(oldName) {
+      const newName = normalizeCategoryName(editingCategoryDraft.value);
+      categoryManagerError.value = '';
+      if (oldName === 'Default') return;
+      if (!editingCategoryDraft.value.trim()) {
+        categoryManagerError.value = 'Category name is required';
+        return;
+      }
+      if (newName === oldName) {
+        cancelRenameCategory();
+        return;
+      }
+      if (categories.value.includes(newName)) {
+        categoryManagerError.value = 'Category already exists';
+        return;
+      }
+      await persistCategory(newName);
+      const changed = accounts.value.filter(account => accountHasCategory(account, oldName));
+      for (const account of changed) {
+        account.categories = normalizeLegacyCategories(account).map(category => category === oldName ? newName : category);
+        persistAccountCategories(account);
+        await dbPut('accounts', account);
+      }
+      await removeStoredCategory(oldName);
+      if (selectedCategory.value === oldName) selectedCategory.value = newName;
+      if (importCategory.value === oldName) importCategory.value = newName;
+      cancelRenameCategory();
+      showToast(`Category renamed to ${newName}`);
+    }
+
+    function requestDeleteCategory(category) {
+      editingCategoryName.value = '';
+      editingCategoryDraft.value = '';
+      deletingCategoryName.value = category;
+      categoryManagerError.value = '';
+    }
+
+    function cancelDeleteCategory() {
+      deletingCategoryName.value = '';
+    }
+
+    async function confirmDeleteCategory(category) {
+      if (category === 'Default') return;
+      const changed = accounts.value.filter(account => accountHasCategory(account, category));
+      for (const account of changed) {
+        const nextCategories = normalizeLegacyCategories(account).filter(item => item !== category);
+        account.categories = nextCategories.length ? nextCategories : ['Default'];
+        persistAccountCategories(account);
+        await dbPut('accounts', account);
+      }
+      await removeStoredCategory(category);
+      if (selectedCategory.value === category) selectedCategory.value = 'Default';
+      if (importCategory.value === category) importCategory.value = 'Default';
+      deletingCategoryName.value = '';
+      showToast(`Category ${category} deleted; ${changed.length} account${changed.length === 1 ? '' : 's'} updated`);
     }
 
     function getExportText() {
-      return accounts.value.map(account => account.raw).join('\n');
+      return filteredAccounts.value.map(account => account.raw).join('\n');
     }
 
     async function copyText(text) {
@@ -975,14 +2000,14 @@ createApp({
 
     async function exportCopy() {
       closeActionsMenu();
-      if (!accounts.value.length) return;
+      if (!filteredAccounts.value.length) return;
       await copyText(getExportText());
-      showToast('All accounts copied');
+      showToast('Filtered accounts copied');
     }
 
     function exportDownload() {
       closeActionsMenu();
-      if (!accounts.value.length) return;
+      if (!filteredAccounts.value.length) return;
       const blob = new Blob([getExportText()], { type: 'text/plain' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -996,22 +2021,44 @@ createApp({
       const raw = importText.value.trim();
       const separator = separatorInput.value || '----';
       if (!raw) return;
+      if (importCategoryMode.value === 'new' && !importNewCategoryName.value.trim()) {
+        showToast('Enter a category name');
+        return;
+      }
       const lines = raw.split('\n').map(line => line.trim()).filter(Boolean);
+      const category = await persistCategory(getImportCategoryName());
       let added = 0;
+      let updated = 0;
+      let firstAddedId = null;
       for (const line of lines) {
-        if (accounts.value.some(account => account.raw === line)) continue;
+        const existingAccount = accounts.value.find(account => account.raw === line);
+        if (existingAccount) {
+          if (!accountHasCategory(existingAccount, category)) {
+            existingAccount.categories = [...normalizeLegacyCategories(existingAccount), category];
+            persistAccountCategories(existingAccount);
+            await dbPut('accounts', existingAccount);
+            updated++;
+          }
+          firstAddedId ||= existingAccount.id;
+          continue;
+        }
         const parts = line.split(separator);
         const email = parts[0] || line.slice(0, 30);
-        const account = { id: crypto.randomUUID(), email, raw: line, separator, seq: ++accountSeq.value, status: null, emailCount: null };
+        const account = { id: crypto.randomUUID(), email, raw: line, separator, category, categories: [category], seq: ++accountSeq.value, status: null, emailCount: null };
         accounts.value.push(account);
         await dbPut('accounts', account);
+        firstAddedId ||= account.id;
         added++;
       }
+      importCategory.value = category;
+      selectedCategory.value = category;
       closeImportModal();
-      if (added > 0 && !activeAccountId.value && accounts.value[0]) {
-        await selectAccount(accounts.value[0].id);
+      if (firstAddedId) {
+        await selectAccount(firstAddedId);
       }
-      showToast(added ? `${added} account${added === 1 ? '' : 's'} imported` : 'No new accounts imported');
+      const importedText = added ? `${added} new` : 'No new';
+      const updatedText = updated ? ` · ${updated} updated` : '';
+      showToast(`${importedText} account${added === 1 ? '' : 's'} imported to ${category}${updatedText}`);
     }
 
     async function removeAccount(id) {
@@ -1029,7 +2076,7 @@ createApp({
 
     async function removeInvalidAccounts() {
       closeActionsMenu();
-      const invalid = accounts.value.filter(account => account.checkStatus === 'invalid');
+      const invalid = filteredAccounts.value.filter(account => account.checkStatus === 'invalid');
       if (!invalid.length) return;
       for (const account of invalid) {
         await dbDelete('accounts', account.id);
@@ -1054,16 +2101,17 @@ createApp({
 
     async function checkAllAccounts() {
       closeActionsMenu();
-      if (!accounts.value.length || checkingAll.value) return;
+      const targetAccounts = filteredAccounts.value;
+      if (!targetAccounts.length || checkingAll.value) return;
       checkingAll.value = true;
-      accounts.value.forEach(account => { account.checkStatus = 'checking'; account.checkError = ''; });
+      targetAccounts.forEach(account => { account.checkStatus = 'checking'; account.checkError = ''; });
       try {
         const resp = await fetch(`${API_BASE}/api/check`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            credentials: accounts.value.map(account => account.raw),
-            separator: accounts.value[0]?.separator || '----',
+            credentials: targetAccounts.map(account => account.raw),
+            separator: targetAccounts[0]?.separator || '----',
           }),
         });
         const data = await resp.json();
@@ -1081,7 +2129,7 @@ createApp({
           throw new Error(data.msg || 'Check failed');
         }
       } catch (error) {
-        accounts.value.forEach(account => { account.checkStatus = ''; });
+        targetAccounts.forEach(account => { account.checkStatus = ''; });
         showToast(error.message || 'Account check failed');
       } finally {
         checkingAll.value = false;
@@ -1141,6 +2189,11 @@ createApp({
       activeEmailId.value = id;
       closeOverlays();
     }
+
+    function categoryCount(category) {
+      return categoryCounts.value.get(category) || 0;
+    }
+
 
     function accountStatusClass(account) {
       if (account.checkStatus) return account.checkStatus;
@@ -1207,8 +2260,29 @@ createApp({
 
     function handleKeydown(event) {
       if (event.key !== 'Escape') return;
+      if (deletingCategoryName.value) {
+        cancelDeleteCategory();
+        return;
+      }
+      if (categoryFilterOpen.value || floatMenu.value.open || actionsMenuOpen.value || importCategoryDropdownOpen.value) {
+        closeOverlays();
+        return;
+      }
+      if (accountCategoryDialogOpen.value) {
+        closeAccountCategoryDialog();
+        return;
+      }
+      if (accountDetailDialogOpen.value) {
+        closeAccountDetailDialog();
+        return;
+      }
+      if (categoryManagerOpen.value) {
+        closeCategoryManager();
+        return;
+      }
       if (importModalOpen.value) {
         closeImportModal();
+        return;
       }
       closeOverlays();
     }
@@ -1217,7 +2291,13 @@ createApp({
       document.addEventListener('click', handleDocumentClick);
       document.addEventListener('keydown', handleKeydown);
       try {
-        accounts.value = await dbGetAllBySeq();
+        const savedCategories = await dbGetAll('categories');
+        storedCategories.value = savedCategories.length ? savedCategories.map(category => category.name) : ['Default'];
+        accounts.value = (await dbGetAllBySeq()).map(account => {
+          const normalized = { ...account };
+          persistAccountCategories(normalized);
+          return normalized;
+        });
         accountSeq.value = accounts.value.length ? Math.max(...accounts.value.map(account => account.seq || 0)) : 0;
       } catch (error) {
         showToast(`Failed to load local data: ${error.message || error}`);
@@ -1235,26 +2315,73 @@ createApp({
       activeAccountId,
       activeEmailId,
       importModalOpen,
+      categoryManagerOpen,
+      accountCategoryDialogOpen,
+      accountDetailDialogOpen,
+      dialogAccountId,
+      accountCategoryDraft,
       actionsMenuOpen,
+      categoryFilterOpen,
       checkingAll,
       loadingEmails,
       emailError,
       importText,
       separatorInput,
+      selectedCategory,
+      importCategory,
+      importCategoryMode,
+      importCategoryDropdownOpen,
+      importNewCategoryName,
+      newManagedCategoryName,
+      editingCategoryName,
+      editingCategoryDraft,
+      deletingCategoryName,
+      categoryManagerError,
       importInputRef,
       toast,
       floatMenu,
+      categories,
+      dialogAccount,
+      filteredAccounts,
       activeAccount,
       activeEmails,
       activeEmail,
       accountCountText,
+      selectedCategoryLabel,
+      selectedCategoryCount,
       hasInvalidAccounts,
       initialEmailLoading,
       emailsTitle,
+      toggleCategoryFilter,
       toggleActionsMenu,
       toggleFloatMenu,
       openImportModal,
       closeImportModal,
+      openCategoryManager,
+      closeCategoryManager,
+      closeAccountCategoryDialog,
+      closeAccountDetailDialog,
+      openAccountCategoryDialog,
+      openAccountDetailDialog,
+      toggleAccountCategoryDraft,
+      saveAccountCategoryDialog,
+      selectCategory,
+      toggleImportCategoryDropdown,
+      selectImportCategory,
+      toggleImportNewCategory,
+      categoryCount,
+      accountHasCategory,
+      accountCategories,
+      visibleAccountCategories,
+      hiddenAccountCategoryCount,
+      accountCategoryLabel,
+      createManagedCategory,
+      startRenameCategory,
+      cancelRenameCategory,
+      saveRenameCategory,
+      requestDeleteCategory,
+      cancelDeleteCategory,
+      confirmDeleteCategory,
       importAccounts,
       removeAccount,
       removeInvalidAccounts,
