@@ -1122,7 +1122,7 @@
       </div>
       <div class="panel-actions">
         <button class="btn btn-sm btn-ghost" type="button" @click="openImportModal">Import</button>
-        <button class="btn btn-sm btn-ghost" type="button" :disabled="checkingAll || !accounts.length" @click.stop="toggleActionsMenu">
+        <button class="btn btn-sm btn-ghost" type="button" :disabled="checkingAll" @click.stop="toggleActionsMenu">
           {{ checkingAll ? 'Checking' : 'Actions' }}
         </button>
         <transition name="fade">
@@ -1131,6 +1131,8 @@
             <button v-if="hasInvalidAccounts" class="menu-item danger" type="button" @click="removeInvalidAccounts">Clear invalid</button>
             <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportCopy">Copy all</button>
             <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportDownload">Download .txt</button>
+            <button class="menu-item" type="button" @click="openBrowserDataImportPicker">Import data</button>
+            <button class="menu-item" type="button" @click="exportBrowserData">Export data</button>
           </div>
         </transition>
       </div>
@@ -1511,6 +1513,8 @@
     </div>
   </transition>
 
+  <input ref="browserDataImportInputRef" type="file" accept="application/json,.json" style="display:none" @change="importBrowserData">
+
   <transition name="fade">
     <div v-if="toast" class="toast" role="status" aria-live="polite">{{ toast }}</div>
   </transition>
@@ -1627,6 +1631,7 @@ createApp({
     const deletingCategoryName = ref('');
     const categoryManagerError = ref('');
     const importInputRef = ref(null);
+    const browserDataImportInputRef = ref(null);
     const toast = ref('');
     const toastTimer = ref(null);
     const floatMenu = ref({ open: false, accountId: null, left: 0, top: 0 });
@@ -1720,7 +1725,7 @@ createApp({
     }
 
     function toggleActionsMenu() {
-      if (!accounts.value.length || checkingAll.value) return;
+      if (checkingAll.value) return;
       actionsMenuOpen.value = !actionsMenuOpen.value;
       closeCategoryFilter();
       closeFloatMenu();
@@ -2015,6 +2020,206 @@ createApp({
       a.click();
       URL.revokeObjectURL(a.href);
       showToast('Download started');
+    }
+
+    function formatBackupTimestamp(date) {
+      return date.toISOString().replace(/[:.]/g, '-');
+    }
+
+    async function exportBrowserData() {
+      closeActionsMenu();
+      try {
+        const exportedAt = new Date();
+        const storedAccounts = await dbGetAllBySeq();
+        const accountsWithoutEmails = storedAccounts.map(({ emails, ...account }) => account);
+        const backup = {
+          app: 'microsoft-manager',
+          type: 'GraphMailBackup',
+          formatVersion: 1,
+          exportedAt: exportedAt.toISOString(),
+          database: { name: DB_NAME, version: DB_VERSION },
+          stores: {
+            accounts: accountsWithoutEmails,
+            categories: await dbGetAll('categories'),
+          },
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `graphmail-backup-${formatBackupTimestamp(exportedAt)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('Data export started');
+      } catch (error) {
+        showToast(`Data export failed: ${error.message || error}`);
+      }
+    }
+
+    function openBrowserDataImportPicker() {
+      closeActionsMenu();
+      browserDataImportInputRef.value?.click();
+    }
+
+    async function importBrowserData(event) {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      try {
+        const backup = JSON.parse(await file.text());
+        const result = await mergeBrowserDataBackup(backup);
+        const skippedText = result.skipped ? `，跳过 ${result.skipped}` : '';
+        showToast(`数据导入完成：新增 ${result.accountsAdded}，更新 ${result.accountsUpdated}，邮件缓存 ${result.emailCachesImported}${skippedText}`);
+      } catch (error) {
+        showToast(`导入数据失败: ${error.message || error}`);
+      }
+    }
+
+    function normalizeBackupStores(backup) {
+      if (!backup || typeof backup !== 'object') throw new Error('备份文件格式无效');
+      if (backup.type && backup.type !== 'GraphMailBackup') throw new Error('不支持的备份文件');
+      const stores = backup.stores || backup;
+      if (!stores || typeof stores !== 'object') throw new Error('备份文件格式无效');
+      const readArray = value => {
+        if (value == null) return [];
+        if (Array.isArray(value)) return value;
+        throw new Error('备份数据结构无效');
+      };
+      return {
+        accounts: readArray(stores.accounts),
+        emails: readArray(stores.emails),
+        categories: readArray(stores.categories),
+      };
+    }
+
+    function importedCategoryName(item) {
+      const value = typeof item === 'string' ? item : item?.name;
+      return normalizeCategoryName(typeof value === 'string' ? value : '');
+    }
+
+    function normalizeImportedAccountCategories(account) {
+      const list = Array.isArray(account?.categories) && account.categories.length ? account.categories : [account?.category];
+      const normalized = Array.from(new Set(list.map(importedCategoryName).filter(Boolean)));
+      return normalized.length ? normalized : ['Default'];
+    }
+
+    function emailMergeKey(email) {
+      return email?.id || `${email?.date || ''}|${email?.subject || ''}|${email?.from?.address || email?.from?.name || ''}`;
+    }
+
+    function mergeEmailLists(currentEmails = [], importedEmails = []) {
+      const byKey = new Map();
+      importedEmails.filter(Boolean).forEach(email => byKey.set(emailMergeKey(email), email));
+      currentEmails.filter(Boolean).forEach(email => byKey.set(emailMergeKey(email), email));
+      return Array.from(byKey.values()).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    }
+
+    async function mergeBrowserDataBackup(backup) {
+      const { accounts: importedAccounts, emails: importedEmailRecords, categories: importedCategories } = normalizeBackupStores(backup);
+      const result = { accountsAdded: 0, accountsUpdated: 0, emailCachesImported: 0, categoriesImported: 0, skipped: 0 };
+      const accountIdMap = new Map();
+      const categoryNames = new Set();
+
+      for (const item of importedCategories) {
+        categoryNames.add(importedCategoryName(item));
+      }
+      for (const account of importedAccounts) {
+        if (account && typeof account === 'object') {
+          normalizeImportedAccountCategories(account).forEach(category => categoryNames.add(category));
+        }
+      }
+      for (const category of categoryNames) {
+        await persistCategory(category);
+        result.categoriesImported++;
+      }
+
+      const byRaw = new Map(accounts.value.filter(account => account.raw).map(account => [account.raw, account]));
+      const byId = new Map(accounts.value.map(account => [account.id, account]));
+      const sortedImportedAccounts = [...importedAccounts].sort((a, b) => (a?.seq || 0) - (b?.seq || 0));
+      const emailRecords = [...importedEmailRecords];
+
+      for (const imported of sortedImportedAccounts) {
+        if (!imported || typeof imported !== 'object') {
+          result.skipped++;
+          continue;
+        }
+        const importedCategories = normalizeImportedAccountCategories(imported);
+        const existing = imported.raw ? byRaw.get(imported.raw) : (imported.id ? byId.get(imported.id) : null);
+
+        if (existing) {
+          existing.categories = Array.from(new Set([...normalizeLegacyCategories(existing), ...importedCategories]));
+          if (!existing.email && imported.email) existing.email = imported.email;
+          if (!existing.raw && imported.raw) existing.raw = imported.raw;
+          if (!existing.separator && imported.separator) existing.separator = imported.separator;
+          persistAccountCategories(existing);
+          await dbPut('accounts', existing);
+          if (imported.id) accountIdMap.set(imported.id, existing.id);
+          result.accountsUpdated++;
+        } else {
+          let id = imported.id || crypto.randomUUID();
+          if (byId.has(id)) id = crypto.randomUUID();
+          const separator = imported.separator || '----';
+          const account = {
+            ...imported,
+            id,
+            seq: ++accountSeq.value,
+            separator,
+            email: imported.email || imported.raw?.split(separator)[0] || 'Imported account',
+            status: imported.status || null,
+            emailCount: imported.emailCount ?? null,
+            categories: importedCategories,
+          };
+          persistAccountCategories(account);
+          accounts.value.push(account);
+          byId.set(account.id, account);
+          if (account.raw) byRaw.set(account.raw, account);
+          await dbPut('accounts', account);
+          if (imported.id) accountIdMap.set(imported.id, account.id);
+          result.accountsAdded++;
+        }
+
+        if (imported.id && Array.isArray(imported.emails)) {
+          emailRecords.push({ accountId: imported.id, emails: imported.emails });
+        }
+      }
+
+      for (const record of emailRecords) {
+        if (!record || typeof record !== 'object' || !Array.isArray(record.emails)) {
+          result.skipped++;
+          continue;
+        }
+        const targetAccountId = accountIdMap.get(record.accountId) || (byId.has(record.accountId) ? record.accountId : null);
+        if (!targetAccountId) {
+          result.skipped++;
+          continue;
+        }
+        const current = await dbGet('emails', targetAccountId);
+        const mergedEmails = mergeEmailLists(current?.emails || [], record.emails);
+        await dbPut('emails', { accountId: targetAccountId, emails: mergedEmails });
+        const account = byId.get(targetAccountId);
+        if (account) {
+          account.emails = mergedEmails;
+          account.emailCount = mergedEmails.length;
+          account.status = 'ok';
+          await dbPut('accounts', account);
+        }
+        result.emailCachesImported++;
+      }
+
+      accounts.value = (await dbGetAllBySeq()).map(account => {
+        const normalized = { ...account };
+        persistAccountCategories(normalized);
+        return normalized;
+      });
+      accountSeq.value = accounts.value.length ? Math.max(...accounts.value.map(account => account.seq || 0)) : 0;
+      if (activeAccountId.value && !accounts.value.some(account => account.id === activeAccountId.value)) {
+        activeAccountId.value = null;
+        activeEmailId.value = null;
+        emailError.value = '';
+      }
+      if (selectedCategory.value !== 'all' && !categories.value.includes(selectedCategory.value)) {
+        selectedCategory.value = 'all';
+      }
+      return result;
     }
 
     async function importAccounts() {
@@ -2338,6 +2543,7 @@ createApp({
       deletingCategoryName,
       categoryManagerError,
       importInputRef,
+      browserDataImportInputRef,
       toast,
       floatMenu,
       categories,
@@ -2383,6 +2589,9 @@ createApp({
       cancelDeleteCategory,
       confirmDeleteCategory,
       importAccounts,
+      openBrowserDataImportPicker,
+      importBrowserData,
+      exportBrowserData,
       removeAccount,
       removeInvalidAccounts,
       copyAccount,
