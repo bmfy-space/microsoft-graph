@@ -16,6 +16,7 @@ GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SCOPE = "https://graph.microsoft.com/.default"
 PAGE_SIZE = 20
 FOLDERS = ["inbox", "junkemail"]
+GRAPH_REQUEST_ERROR = "Graph API request failed. Please retry."
 
 EMAIL_FIELDS = (
     "id,internetMessageId,subject,bodyPreview,receivedDateTime,"
@@ -68,7 +69,7 @@ def _fetch_folder_page(
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
-    resp = requests.get(url, params=params, headers=headers, timeout=30)
+    resp = requests.get(url, params=params, headers=headers, timeout=10)
     resp.raise_for_status()
     data = resp.json()
     return data.get("value", []), data.get("@odata.nextLink")
@@ -168,14 +169,18 @@ def api_email():
     except ValueError:
         return jsonify({"code": 400, "msg": "Invalid credentials format"}), 400
 
-    access_token = get_access_token(creds["client_id"], creds["refresh_token"])
+    try:
+        access_token = get_access_token(creds["client_id"], creds["refresh_token"])
+    except requests.RequestException:
+        return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
+
     if access_token is None:
         return jsonify({"code": 401, "msg": "Failed to refresh token"}), 401
 
     try:
         items = fetch_emails(access_token, page, page_size, folders)
-    except requests.HTTPError as e:
-        return jsonify({"code": 502, "msg": f"Graph API error: {e}"}), 502
+    except requests.RequestException:
+        return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
 
     return jsonify({
         "code": 200,
@@ -213,7 +218,12 @@ def api_check():
             results.append({"email": raw.split(separator)[0], "valid": False, "error": "Invalid format"})
             continue
 
-        token = get_access_token(creds["client_id"], creds["refresh_token"])
+        try:
+            token = get_access_token(creds["client_id"], creds["refresh_token"])
+        except requests.RequestException:
+            results.append({"email": creds["email"], "valid": False, "error": GRAPH_REQUEST_ERROR})
+            continue
+
         if token:
             results.append({"email": creds["email"], "valid": True})
         else:
