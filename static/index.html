@@ -1277,7 +1277,7 @@
           </div>
         </div>
         <div class="content-body">
-          <iframe v-if="isHtmlEmail(activeEmail)" sandbox="allow-same-origin" :srcdoc="activeEmail.body.content || ''" title="Email HTML content"></iframe>
+          <iframe v-if="isHtmlEmail(activeEmail)" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" :srcdoc="safeEmailHtml(activeEmail)" title="Email HTML content"></iframe>
           <div v-else class="text-content">{{ activeEmail.body?.content || '' }}</div>
         </div>
       </div>
@@ -2444,8 +2444,37 @@ createApp({
       return (recipients || []).join(', ');
     }
 
+    const safeLinkProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
     function isHtmlEmail(email) {
       return email?.body?.contentType === 'html';
+    }
+
+    function safeEmailHtml(email) {
+      const content = email?.body?.content || '';
+      if (!content) return '';
+
+      const document = new DOMParser().parseFromString(content, 'text/html');
+      document.querySelectorAll('a[href]').forEach(anchor => {
+        const href = anchor.getAttribute('href') || '';
+        try {
+          const url = new URL(href, window.location.href);
+          if (!safeLinkProtocols.has(url.protocol)) {
+            anchor.removeAttribute('href');
+            anchor.removeAttribute('target');
+            anchor.removeAttribute('rel');
+            return;
+          }
+          anchor.setAttribute('target', '_blank');
+          anchor.setAttribute('rel', 'noopener noreferrer');
+        } catch {
+          anchor.removeAttribute('href');
+          anchor.removeAttribute('target');
+          anchor.removeAttribute('rel');
+        }
+      });
+
+      return document.documentElement.outerHTML;
     }
 
     function formatDate(raw) {
@@ -2609,6 +2638,7 @@ createApp({
       emailFrom,
       recipientText,
       isHtmlEmail,
+      safeEmailHtml,
       formatDate,
     };
   },
