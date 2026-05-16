@@ -69,7 +69,7 @@ def _fetch_folder_page(
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
-    resp = requests.get(url, params=params, headers=headers, timeout=10)
+    resp = requests.get(url, params=params, headers=headers, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     return data.get("value", []), data.get("@odata.nextLink")
