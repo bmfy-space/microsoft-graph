@@ -248,43 +248,53 @@
     min-width: 0;
   }
 
-  .category-filter-trigger {
+  .category-filter-control {
     width: 100%;
     min-height: 32px;
-    padding: 0 12px;
+    padding: 0 6px 0 0;
     border: 1px solid var(--color-border);
     border-radius: 999px;
     background: #fff;
-    color: var(--color-foreground);
-    cursor: pointer;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 10px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: 10px;
-    text-align: left;
+    gap: 8px;
     transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
   }
 
-  .category-filter-trigger:hover,
-  .category-filter-trigger.open {
+  .category-filter-control:hover {
     border-color: #bfdbfe;
     background: var(--color-primary-soft);
     box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .08);
   }
 
-  .category-filter-trigger:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
-
-  .category-filter-label {
+  .category-filter-input {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-height: 32px;
+    padding: 0 0 0 12px;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+    color: var(--color-foreground);
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 750;
+  }
+
+  .category-filter-input:focus,
+  .category-filter-input:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .category-filter-input::placeholder {
+    color: var(--color-muted);
+    font-weight: 650;
   }
 
   .category-filter-count {
     min-width: 24px;
+    max-width: 96px;
     min-height: 22px;
     padding: 0 7px;
     border-radius: 999px;
@@ -293,9 +303,27 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 12px;
     font-weight: 800;
   }
+
+  .category-filter-toggle {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .category-filter-toggle:focus-visible { outline: 3px solid rgba(37, 99, 235, .22); outline-offset: 2px; }
 
   .category-filter-chevron {
     width: 8px;
@@ -307,9 +335,10 @@
     transition: transform var(--transition), border-color var(--transition);
   }
 
-  .category-filter-trigger:hover .category-filter-chevron,
-  .category-filter-trigger.open .category-filter-chevron { border-color: var(--color-primary-strong); }
-  .category-filter-trigger.open .category-filter-chevron { transform: rotate(225deg) translate(-2px, -1px); }
+  .category-filter-control:hover .category-filter-chevron,
+  .category-filter-control.open .category-filter-chevron,
+  .category-filter-toggle:focus-visible .category-filter-chevron { border-color: var(--color-primary-strong); }
+  .category-filter-control.open .category-filter-chevron { transform: rotate(225deg) translate(-2px, -1px); }
 
   .category-filter-menu {
     max-height: min(320px, calc(100dvh - 180px));
@@ -1143,20 +1172,34 @@
     <div v-if="accounts.length" class="category-filter-panel" aria-label="Category filters">
       <div class="category-filter-row">
         <div class="category-filter-dropdown" @click.stop>
-          <button class="category-filter-trigger" type="button" :class="{ open: categoryFilterOpen }" :aria-expanded="categoryFilterOpen" aria-haspopup="listbox" @click.stop="toggleCategoryFilter($event)">
-            <span class="category-filter-label">{{ selectedCategoryLabel }}</span>
-            <span class="category-filter-count">{{ selectedCategoryCount }}</span>
-            <span class="category-filter-chevron" aria-hidden="true"></span>
-          </button>
+          <div ref="categoryFilterControlRef" class="category-filter-control" :class="{ open: categoryFilterOpen }">
+            <input
+              class="category-filter-input"
+              type="text"
+              v-model="categorySearchQuery"
+              placeholder="Search email"
+              :aria-expanded="categoryFilterOpen"
+              aria-haspopup="listbox"
+              @focus="openCategoryFilter"
+              @click.stop="openCategoryFilter"
+              @input="openCategoryFilter"
+            >
+            <span class="category-filter-count" :title="selectedCategoryLabel">{{ selectedCategoryCount }}</span>
+            <button class="category-filter-toggle" type="button" aria-label="Toggle category filter" @click.stop="toggleCategoryFilter($event)">
+              <span class="category-filter-chevron" aria-hidden="true"></span>
+            </button>
+          </div>
           <transition name="fade">
-            <div v-if="categoryFilterOpen" ref="categoryFilterMenuRef" class="menu category-menu category-filter-menu" :style="categoryFilterMenuStyle" role="listbox" @click.stop>
-              <button class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategory === 'all'" :class="{ selected: selectedCategory === 'all' }" @click="selectCategory('all')">
+            <div v-if="categoryFilterOpen" ref="categoryFilterMenuRef" class="menu category-menu category-filter-menu multi-category-menu" :style="categoryFilterMenuStyle" role="listbox" aria-multiselectable="true" @click.stop>
+              <div class="menu-title">Categories</div>
+              <div v-if="categorySearchQuery.trim()" class="menu-empty">Searching by email. Clear the input to apply category filters.</div>
+              <button class="menu-item category-menu-item" type="button" role="option" :aria-selected="!selectedCategories.length" :class="{ selected: !selectedCategories.length }" @click="selectCategory('all')">
                 <span>All</span>
-                <span>{{ accounts.length }}</span>
+                <span class="menu-item-check" aria-hidden="true">{{ !selectedCategories.length ? '✓' : '' }}</span>
               </button>
-              <button v-for="category in categories" :key="category" class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategory === category" :class="{ selected: selectedCategory === category }" @click="selectCategory(category)">
-                <span>{{ category }}</span>
-                <span>{{ categoryCount(category) }}</span>
+              <button v-for="category in categories" :key="category" class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategories.includes(category)" :class="{ selected: selectedCategories.includes(category) }" @click="selectCategory(category)">
+                <span>{{ category }} · {{ categoryCount(category) }}</span>
+                <span class="menu-item-check" aria-hidden="true">{{ selectedCategories.includes(category) ? '✓' : '' }}</span>
               </button>
             </div>
           </transition>
@@ -1171,8 +1214,8 @@
         <span>Import credentials to load mail from Microsoft Graph.</span>
       </div>
       <div v-else-if="!filteredAccounts.length" class="empty">
-        <strong>No accounts in this category</strong>
-        <span>Choose another category or import accounts into {{ selectedCategory }}.</span>
+        <strong>{{ categorySearchQuery.trim() ? 'No accounts match this email search' : 'No accounts in the selected categories' }}</strong>
+        <span>{{ categorySearchQuery.trim() ? 'Clear the email search or use the category dropdown to browse accounts.' : 'Choose other categories or import accounts into the selected categories.' }}</span>
       </div>
       <div v-else class="list">
         <div v-for="account in filteredAccounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
@@ -1476,30 +1519,30 @@
             <div class="field-hint">Default format: email----password----clientId----refreshToken</div>
           </div>
           <div class="field">
-            <label id="importCategoryLabel">Assign category</label>
+            <label id="importCategoryLabel">Assign categories</label>
             <div class="custom-select-row">
               <div class="custom-select" @click.stop>
                 <button class="custom-select-trigger" type="button" :class="{ open: importCategoryDropdownOpen }" aria-labelledby="importCategoryLabel" aria-haspopup="listbox" :aria-expanded="importCategoryDropdownOpen" @click.stop="toggleImportCategoryDropdown($event)">
-                  <span class="custom-select-value">{{ importCategory }}</span>
+                  <span class="custom-select-value" :title="importCategoriesLabel">{{ importCategoriesLabel }}</span>
                   <span class="custom-select-chevron" aria-hidden="true"></span>
                 </button>
                 <transition name="fade">
-                  <div v-if="importCategoryDropdownOpen" ref="importCategoryMenuRef" class="menu custom-select-menu" :style="importCategoryMenuStyle" role="listbox" @click.stop>
-                    <button v-for="category in categories" :key="category" class="menu-item" type="button" role="option" :aria-selected="importCategory === category" :class="{ selected: importCategory === category }" @click="selectImportCategory(category)">
+                  <div v-if="importCategoryDropdownOpen" ref="importCategoryMenuRef" class="menu custom-select-menu multi-category-menu" :style="importCategoryMenuStyle" role="listbox" aria-multiselectable="true" @click.stop>
+                    <button v-for="category in categories" :key="category" class="menu-item" type="button" role="option" :aria-selected="importCategories.includes(category)" :class="{ selected: importCategories.includes(category) }" @click="selectImportCategory(category)">
                       <span>{{ category }}</span>
-                      <span v-if="importCategory === category">✓</span>
+                      <span class="menu-item-check" aria-hidden="true">{{ importCategories.includes(category) ? '✓' : '' }}</span>
                     </button>
                   </div>
                 </transition>
               </div>
-              <button class="btn btn-sm btn-ghost custom-select-add" type="button" @click="toggleImportNewCategory">{{ importCategoryMode === 'new' ? 'Use existing' : 'Create new category' }}</button>
+              <button class="btn btn-sm btn-ghost custom-select-add" type="button" @click="toggleImportNewCategory">{{ importNewCategoryVisible ? 'Hide new category' : 'Add new category' }}</button>
             </div>
-            <div class="field-hint">Imported accounts will be placed in this category.</div>
+            <div class="field-hint">Imported accounts will be placed in all selected categories.</div>
           </div>
-          <div v-if="importCategoryMode === 'new'" class="field">
+          <div v-if="importNewCategoryVisible" class="field">
             <label for="newCategoryInput">New category</label>
-            <input id="newCategoryInput" v-model="importNewCategoryName" autocomplete="off" placeholder="Category name">
-            <div class="field-hint">This category will be created before importing.</div>
+            <input id="newCategoryInput" ref="importNewCategoryInputRef" v-model="importNewCategoryName" autocomplete="off" placeholder="Category name">
+            <div class="field-hint">This category will be created and added alongside the selected categories.</div>
           </div>
           <div class="field">
             <label for="importInput">Credentials</label>
@@ -1622,10 +1665,11 @@ createApp({
     const emailError = ref('');
     const importText = ref('');
     const separatorInput = ref('----');
-    const selectedCategory = ref('all');
-    const importCategory = ref('Default');
-    const importCategoryMode = ref('existing');
+    const categorySearchQuery = ref('');
+    const selectedCategories = ref([]);
+    const importCategories = ref(['Default']);
     const importCategoryDropdownOpen = ref(false);
+    const importNewCategoryVisible = ref(false);
     const importNewCategoryName = ref('');
     const newManagedCategoryName = ref('');
     const editingCategoryName = ref('');
@@ -1633,8 +1677,10 @@ createApp({
     const deletingCategoryName = ref('');
     const categoryManagerError = ref('');
     const importInputRef = ref(null);
+    const importNewCategoryInputRef = ref(null);
     const browserDataImportInputRef = ref(null);
     const actionsMenuRef = ref(null);
+    const categoryFilterControlRef = ref(null);
     const categoryFilterMenuRef = ref(null);
     const importCategoryMenuRef = ref(null);
     const floatMenuRef = ref(null);
@@ -1666,15 +1712,32 @@ createApp({
       return counts;
     });
     const dialogAccount = computed(() => accounts.value.find(account => account.id === dialogAccountId.value) || null);
-    const filteredAccounts = computed(() => selectedCategory.value === 'all'
-      ? accounts.value
-      : accounts.value.filter(account => normalizeLegacyCategories(account).includes(selectedCategory.value)));
+    const filteredAccounts = computed(() => {
+      const query = categorySearchQuery.value.trim().toLowerCase();
+      if (query) {
+        return accounts.value.filter(account => (account.email || '').toLowerCase().includes(query));
+      }
+      if (!selectedCategories.value.length) return accounts.value;
+      return accounts.value.filter(account => selectedCategories.value.some(category => accountHasCategory(account, category)));
+    });
     const activeAccount = computed(() => accounts.value.find(account => account.id === activeAccountId.value) || null);
     const activeEmails = computed(() => activeAccount.value?.emails || []);
     const activeEmail = computed(() => activeEmails.value.find(email => email.id === activeEmailId.value) || null);
     const accountCountText = computed(() => filteredAccounts.value.length ? `${filteredAccounts.value.length} visible · ${accounts.value.length} total` : 'No accounts in filter');
-    const selectedCategoryLabel = computed(() => selectedCategory.value === 'all' ? 'All' : selectedCategory.value);
-    const selectedCategoryCount = computed(() => selectedCategory.value === 'all' ? accounts.value.length : categoryCount(selectedCategory.value));
+    const selectedCategoryLabel = computed(() => {
+      if (categorySearchQuery.value.trim()) return `Search by email: ${categorySearchQuery.value.trim()}`;
+      if (!selectedCategories.value.length) return 'All categories';
+      return selectedCategories.value.join(' · ');
+    });
+    const selectedCategoryCount = computed(() => {
+      if (categorySearchQuery.value.trim()) return 'Search';
+      return selectedCategories.value.length ? String(selectedCategories.value.length) : 'All';
+    });
+    const importCategoriesLabel = computed(() => {
+      const selected = importCategories.value.length ? importCategories.value.join(' · ') : 'Default';
+      const newCategory = importNewCategoryName.value.trim();
+      return newCategory ? `${selected} + ${normalizeCategoryName(newCategory)}` : selected;
+    });
     const hasInvalidAccounts = computed(() => filteredAccounts.value.some(account => account.checkStatus === 'invalid'));
     const initialEmailLoading = computed(() => loadingEmails.value && !activeEmails.value.length);
     const emailsTitle = computed(() => {
@@ -1774,21 +1837,25 @@ createApp({
       closeImportCategoryDropdown();
     }
 
-    function toggleCategoryFilter(event) {
-      if (categoryFilterOpen.value) {
-        closeCategoryFilter();
-        return;
-      }
+    function openCategoryFilter() {
       closeActionsMenu();
       closeFloatMenu();
       closeImportCategoryDropdown();
       categoryFilterOpen.value = true;
-      positionMenu(categoryFilterMenuStyle, event.currentTarget, categoryFilterMenuRef, {
+      positionMenu(categoryFilterMenuStyle, categoryFilterControlRef.value, categoryFilterMenuRef, {
         matchTriggerWidth: true,
         minWidth: 220,
-        maxWidth: 280,
-        preferredHeight: 240,
+        maxWidth: 320,
+        preferredHeight: 280,
       });
+    }
+
+    function toggleCategoryFilter() {
+      if (categoryFilterOpen.value) {
+        closeCategoryFilter();
+        return;
+      }
+      openCategoryFilter();
     }
 
     function toggleActionsMenu(event) {
@@ -1839,9 +1906,10 @@ createApp({
     function closeImportModal() {
       importModalOpen.value = false;
       importText.value = '';
-      importCategoryMode.value = 'existing';
+      importCategories.value = ['Default'];
       importCategoryDropdownOpen.value = false;
       importCategoryMenuStyle.value = {};
+      importNewCategoryVisible.value = false;
       importNewCategoryName.value = '';
     }
 
@@ -1866,14 +1934,22 @@ createApp({
     }
 
     function selectImportCategory(category) {
-      importCategory.value = category;
-      importCategoryMode.value = 'existing';
-      closeImportCategoryDropdown();
+      if (importCategories.value.includes(category)) {
+        const next = importCategories.value.filter(item => item !== category);
+        importCategories.value = next.length ? next : ['Default'];
+        return;
+      }
+      importCategories.value = [...importCategories.value, category];
     }
 
     function toggleImportNewCategory() {
-      importCategoryMode.value = importCategoryMode.value === 'new' ? 'existing' : 'new';
-      if (importCategoryMode.value === 'new') closeImportCategoryDropdown();
+      importNewCategoryVisible.value = !importNewCategoryVisible.value;
+      if (!importNewCategoryVisible.value) {
+        importNewCategoryName.value = '';
+        return;
+      }
+      closeImportCategoryDropdown();
+      nextTick(() => importNewCategoryInputRef.value?.focus());
     }
 
     function openCategoryManager() {
@@ -1901,8 +1977,33 @@ createApp({
       account.category = account.categories[0] || 'Default';
     }
 
-    function getImportCategoryName() {
-      return normalizeCategoryName(importCategoryMode.value === 'new' ? importNewCategoryName.value : importCategory.value);
+    function normalizeCategoryList(values) {
+      const normalized = [];
+      const seen = new Set();
+      for (const value of values || []) {
+        const raw = (value || '').trim();
+        if (!raw) continue;
+        const name = normalizeCategoryName(raw);
+        if (seen.has(name)) continue;
+        seen.add(name);
+        normalized.push(name);
+      }
+      return normalized;
+    }
+
+    function replaceCategoryInList(values, oldName, newName) {
+      return normalizeCategoryList((values || []).map(value => value === oldName ? newName : value));
+    }
+
+    function removeCategoryFromList(values, category) {
+      return normalizeCategoryList((values || []).filter(value => value !== category));
+    }
+
+    function getImportCategories() {
+      const selected = normalizeCategoryList(importCategories.value);
+      const created = importNewCategoryName.value.trim() ? [importNewCategoryName.value] : [];
+      const combined = normalizeCategoryList([...selected, ...created]);
+      return combined.length ? combined : ['Default'];
     }
 
     async function persistCategory(category) {
@@ -1966,7 +2067,7 @@ createApp({
       account.categories = accountCategoryDraft.value.length ? [...accountCategoryDraft.value] : ['Default'];
       persistAccountCategories(account);
       await dbPut('accounts', account);
-      if (selectedCategory.value !== 'all' && !accountHasCategory(account, selectedCategory.value)) {
+      if (activeAccountId.value && !filteredAccounts.value.some(item => item.id === activeAccountId.value)) {
         activeAccountId.value = null;
         activeEmailId.value = null;
         emailError.value = '';
@@ -1981,8 +2082,13 @@ createApp({
     }
 
     function selectCategory(category) {
-      selectedCategory.value = category;
-      closeOverlays();
+      if (category === 'all') {
+        selectedCategories.value = [];
+      } else if (selectedCategories.value.includes(category)) {
+        selectedCategories.value = selectedCategories.value.filter(item => item !== category);
+      } else {
+        selectedCategories.value = [...selectedCategories.value, category];
+      }
       if (activeAccountId.value && !filteredAccounts.value.some(account => account.id === activeAccountId.value)) {
         activeAccountId.value = null;
         activeEmailId.value = null;
@@ -2044,8 +2150,8 @@ createApp({
         await dbPut('accounts', account);
       }
       await removeStoredCategory(oldName);
-      if (selectedCategory.value === oldName) selectedCategory.value = newName;
-      if (importCategory.value === oldName) importCategory.value = newName;
+      selectedCategories.value = replaceCategoryInList(selectedCategories.value, oldName, newName);
+      importCategories.value = replaceCategoryInList(importCategories.value, oldName, newName);
       cancelRenameCategory();
       showToast(`Category renamed to ${newName}`);
     }
@@ -2071,8 +2177,9 @@ createApp({
         await dbPut('accounts', account);
       }
       await removeStoredCategory(category);
-      if (selectedCategory.value === category) selectedCategory.value = 'Default';
-      if (importCategory.value === category) importCategory.value = 'Default';
+      selectedCategories.value = removeCategoryFromList(selectedCategories.value, category);
+      importCategories.value = removeCategoryFromList(importCategories.value, category);
+      if (!importCategories.value.length) importCategories.value = ['Default'];
       deletingCategoryName.value = '';
       showToast(`Category ${category} deleted; ${changed.length} account${changed.length === 1 ? '' : 's'} updated`);
     }
@@ -2307,9 +2414,9 @@ createApp({
         activeEmailId.value = null;
         emailError.value = '';
       }
-      if (selectedCategory.value !== 'all' && !categories.value.includes(selectedCategory.value)) {
-        selectedCategory.value = 'all';
-      }
+      selectedCategories.value = selectedCategories.value.filter(category => categories.value.includes(category));
+      importCategories.value = importCategories.value.filter(category => categories.value.includes(category));
+      if (!importCategories.value.length) importCategories.value = ['Default'];
       return result;
     }
 
@@ -2317,20 +2424,20 @@ createApp({
       const raw = importText.value.trim();
       const separator = separatorInput.value || '----';
       if (!raw) return;
-      if (importCategoryMode.value === 'new' && !importNewCategoryName.value.trim()) {
-        showToast('Enter a category name');
-        return;
-      }
       const lines = raw.split('\n').map(line => line.trim()).filter(Boolean);
-      const category = await persistCategory(getImportCategoryName());
+      const categoriesToApply = getImportCategories();
+      for (const category of categoriesToApply) {
+        await persistCategory(category);
+      }
       let added = 0;
       let updated = 0;
       let firstAddedId = null;
       for (const line of lines) {
         const existingAccount = accounts.value.find(account => account.raw === line);
         if (existingAccount) {
-          if (!accountHasCategory(existingAccount, category)) {
-            existingAccount.categories = [...normalizeLegacyCategories(existingAccount), category];
+          const mergedCategories = normalizeCategoryList([...normalizeLegacyCategories(existingAccount), ...categoriesToApply]);
+          if (mergedCategories.length !== normalizeLegacyCategories(existingAccount).length) {
+            existingAccount.categories = mergedCategories;
             persistAccountCategories(existingAccount);
             await dbPut('accounts', existingAccount);
             updated++;
@@ -2340,21 +2447,31 @@ createApp({
         }
         const parts = line.split(separator);
         const email = parts[0] || line.slice(0, 30);
-        const account = { id: crypto.randomUUID(), email, raw: line, separator, category, categories: [category], seq: ++accountSeq.value, status: null, emailCount: null };
+        const account = {
+          id: crypto.randomUUID(),
+          email,
+          raw: line,
+          separator,
+          category: categoriesToApply[0],
+          categories: [...categoriesToApply],
+          seq: ++accountSeq.value,
+          status: null,
+          emailCount: null,
+        };
         accounts.value.push(account);
         await dbPut('accounts', account);
         firstAddedId ||= account.id;
         added++;
       }
-      importCategory.value = category;
-      selectedCategory.value = category;
+      categorySearchQuery.value = '';
+      selectedCategories.value = [...categoriesToApply];
       closeImportModal();
       if (firstAddedId) {
         await selectAccount(firstAddedId);
       }
       const importedText = added ? `${added} new` : 'No new';
       const updatedText = updated ? ` · ${updated} updated` : '';
-      showToast(`${importedText} account${added === 1 ? '' : 's'} imported to ${category}${updatedText}`);
+      showToast(`${importedText} account${added === 1 ? '' : 's'} imported to ${categoriesToApply.join(' · ')}${updatedText}`);
     }
 
     async function removeAccount(id) {
@@ -2652,10 +2769,11 @@ createApp({
       emailError,
       importText,
       separatorInput,
-      selectedCategory,
-      importCategory,
-      importCategoryMode,
+      categorySearchQuery,
+      selectedCategories,
+      importCategories,
       importCategoryDropdownOpen,
+      importNewCategoryVisible,
       importNewCategoryName,
       newManagedCategoryName,
       editingCategoryName,
@@ -2663,8 +2781,10 @@ createApp({
       deletingCategoryName,
       categoryManagerError,
       importInputRef,
+      importNewCategoryInputRef,
       browserDataImportInputRef,
       actionsMenuRef,
+      categoryFilterControlRef,
       categoryFilterMenuRef,
       importCategoryMenuRef,
       floatMenuRef,
@@ -2683,9 +2803,11 @@ createApp({
       accountCountText,
       selectedCategoryLabel,
       selectedCategoryCount,
+      importCategoriesLabel,
       hasInvalidAccounts,
       initialEmailLoading,
       emailsTitle,
+      openCategoryFilter,
       toggleCategoryFilter,
       toggleActionsMenu,
       toggleFloatMenu,
