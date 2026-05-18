@@ -312,9 +312,6 @@
   .category-filter-trigger.open .category-filter-chevron { transform: rotate(225deg) translate(-2px, -1px); }
 
   .category-filter-menu {
-    left: 0;
-    right: 0;
-    top: calc(100% + 6px);
     max-height: min(320px, calc(100dvh - 180px));
     overflow: auto;
   }
@@ -630,16 +627,24 @@
   }
 
   .float-menu,
-  .category-menu {
+  .category-menu,
+  .actions-menu,
+  .custom-select-menu {
     position: fixed;
     z-index: 1000;
+  }
+
+  .actions-menu,
+  .float-menu,
+  .category-menu,
+  .custom-select-menu {
+    overflow: auto;
   }
 
   .category-menu {
     min-width: 220px;
     max-width: 280px;
     max-height: min(360px, calc(100dvh - 20px));
-    overflow: auto;
   }
 
   .menu-title {
@@ -751,9 +756,6 @@
   .custom-select-trigger.open .custom-select-chevron { transform: rotate(225deg) translate(-2px, -1px); border-color: var(--color-primary-strong); }
 
   .custom-select-menu {
-    left: 0;
-    right: 0;
-    top: calc(100% + 6px);
     max-height: 240px;
     overflow: auto;
   }
@@ -1122,11 +1124,11 @@
       </div>
       <div class="panel-actions">
         <button class="btn btn-sm btn-ghost" type="button" @click="openImportModal">Import</button>
-        <button class="btn btn-sm btn-ghost" type="button" :disabled="checkingAll" @click.stop="toggleActionsMenu">
+        <button class="btn btn-sm btn-ghost" type="button" :disabled="checkingAll" @click.stop="toggleActionsMenu($event)">
           {{ checkingAll ? 'Checking' : 'Actions' }}
         </button>
         <transition name="fade">
-          <div v-if="actionsMenuOpen" class="menu" style="right:0;top:42px" @click.stop>
+          <div v-if="actionsMenuOpen" ref="actionsMenuRef" class="menu actions-menu" :style="actionsMenuStyle" @click.stop>
             <button class="menu-item" type="button" :disabled="checkingAll || !accounts.length" @click="checkAllAccounts">Check all</button>
             <button v-if="hasInvalidAccounts" class="menu-item danger" type="button" @click="removeInvalidAccounts">Clear invalid</button>
             <button class="menu-item" type="button" :disabled="!accounts.length" @click="exportCopy">Copy all</button>
@@ -1141,13 +1143,13 @@
     <div v-if="accounts.length" class="category-filter-panel" aria-label="Category filters">
       <div class="category-filter-row">
         <div class="category-filter-dropdown" @click.stop>
-          <button class="category-filter-trigger" type="button" :class="{ open: categoryFilterOpen }" :aria-expanded="categoryFilterOpen" aria-haspopup="listbox" @click.stop="toggleCategoryFilter">
+          <button class="category-filter-trigger" type="button" :class="{ open: categoryFilterOpen }" :aria-expanded="categoryFilterOpen" aria-haspopup="listbox" @click.stop="toggleCategoryFilter($event)">
             <span class="category-filter-label">{{ selectedCategoryLabel }}</span>
             <span class="category-filter-count">{{ selectedCategoryCount }}</span>
             <span class="category-filter-chevron" aria-hidden="true"></span>
           </button>
           <transition name="fade">
-            <div v-if="categoryFilterOpen" class="menu category-filter-menu" role="listbox" @click.stop>
+            <div v-if="categoryFilterOpen" ref="categoryFilterMenuRef" class="menu category-menu category-filter-menu" :style="categoryFilterMenuStyle" role="listbox" @click.stop>
               <button class="menu-item category-menu-item" type="button" role="option" :aria-selected="selectedCategory === 'all'" :class="{ selected: selectedCategory === 'all' }" @click="selectCategory('all')">
                 <span>All</span>
                 <span>{{ accounts.length }}</span>
@@ -1285,7 +1287,7 @@
   </section>
 
   <transition name="fade">
-    <div v-if="floatMenu.open" class="menu float-menu" :style="{ left: floatMenu.left + 'px', top: floatMenu.top + 'px' }" @click.stop>
+    <div v-if="floatMenu.open" ref="floatMenuRef" class="menu float-menu" :style="floatMenuStyle" @click.stop>
       <button class="menu-item" type="button" @click="openAccountDetailDialog(floatMenu.accountId)">Details</button>
       <button class="menu-item" type="button" @click="openAccountCategoryDialog(floatMenu.accountId)">Categories</button>
       <button class="menu-item" type="button" @click="copyAccount(floatMenu.accountId)">Copy</button>
@@ -1477,12 +1479,12 @@
             <label id="importCategoryLabel">Assign category</label>
             <div class="custom-select-row">
               <div class="custom-select" @click.stop>
-                <button class="custom-select-trigger" type="button" :class="{ open: importCategoryDropdownOpen }" aria-labelledby="importCategoryLabel" aria-haspopup="listbox" :aria-expanded="importCategoryDropdownOpen" @click.stop="toggleImportCategoryDropdown">
+                <button class="custom-select-trigger" type="button" :class="{ open: importCategoryDropdownOpen }" aria-labelledby="importCategoryLabel" aria-haspopup="listbox" :aria-expanded="importCategoryDropdownOpen" @click.stop="toggleImportCategoryDropdown($event)">
                   <span class="custom-select-value">{{ importCategory }}</span>
                   <span class="custom-select-chevron" aria-hidden="true"></span>
                 </button>
                 <transition name="fade">
-                  <div v-if="importCategoryDropdownOpen" class="menu custom-select-menu" role="listbox" @click.stop>
+                  <div v-if="importCategoryDropdownOpen" ref="importCategoryMenuRef" class="menu custom-select-menu" :style="importCategoryMenuStyle" role="listbox" @click.stop>
                     <button v-for="category in categories" :key="category" class="menu-item" type="button" role="option" :aria-selected="importCategory === category" :class="{ selected: importCategory === category }" @click="selectImportCategory(category)">
                       <span>{{ category }}</span>
                       <span v-if="importCategory === category">✓</span>
@@ -1632,9 +1634,17 @@ createApp({
     const categoryManagerError = ref('');
     const importInputRef = ref(null);
     const browserDataImportInputRef = ref(null);
+    const actionsMenuRef = ref(null);
+    const categoryFilterMenuRef = ref(null);
+    const importCategoryMenuRef = ref(null);
+    const floatMenuRef = ref(null);
     const toast = ref('');
     const toastTimer = ref(null);
-    const floatMenu = ref({ open: false, accountId: null, left: 0, top: 0 });
+    const actionsMenuStyle = ref({});
+    const categoryFilterMenuStyle = ref({});
+    const importCategoryMenuStyle = ref({});
+    const floatMenuStyle = ref({});
+    const floatMenu = ref({ open: false, accountId: null });
 
     const categories = computed(() => {
       const names = new Set(['Default', ...storedCategories.value]);
@@ -1679,16 +1689,62 @@ createApp({
       toastTimer.value = window.setTimeout(() => { toast.value = ''; }, 3200);
     }
 
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function getMenuStyle(triggerElement, menuElement, options = {}) {
+      const margin = options.margin ?? 8;
+      const gap = options.gap ?? 6;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const triggerRect = triggerElement.getBoundingClientRect();
+      const measuredWidth = menuElement.offsetWidth || options.estimatedWidth || triggerRect.width;
+      const maxWidth = Math.min(options.maxWidth ?? (viewportWidth - margin * 2), viewportWidth - margin * 2);
+      const baseWidth = options.matchTriggerWidth ? triggerRect.width : Math.max(measuredWidth, options.minWidth ?? 0);
+      const width = clamp(baseWidth, options.minWidth ?? 0, Math.max(options.minWidth ?? 0, maxWidth));
+      const measuredHeight = menuElement.offsetHeight || options.estimatedHeight || 200;
+      const leftBase = options.align === 'right' ? triggerRect.right - width : triggerRect.left;
+      const left = clamp(leftBase, margin, Math.max(margin, viewportWidth - width - margin));
+      const spaceBelow = Math.max(0, viewportHeight - triggerRect.bottom - gap - margin);
+      const spaceAbove = Math.max(0, triggerRect.top - gap - margin);
+      const preferredHeight = Math.min(measuredHeight, options.preferredHeight ?? measuredHeight);
+      const openUp = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+      const availableHeight = openUp ? spaceAbove : spaceBelow;
+      const visibleHeight = Math.min(measuredHeight, availableHeight);
+      const topBase = openUp ? triggerRect.top - gap - visibleHeight : triggerRect.bottom + gap;
+      const top = clamp(topBase, margin, Math.max(margin, viewportHeight - visibleHeight - margin));
+      const style = {
+        left: `${Math.round(left)}px`,
+        top: `${Math.round(top)}px`,
+      };
+      if (options.matchTriggerWidth) style.width = `${Math.round(width)}px`;
+      if (!options.matchTriggerWidth && options.minWidth != null) style.minWidth = `${options.minWidth}px`;
+      if (options.maxWidth != null) style.maxWidth = `${Math.round(maxWidth)}px`;
+      if (options.scrollable !== false) style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
+      return style;
+    }
+
+    function positionMenu(styleRef, triggerElement, menuRef, options) {
+      nextTick(() => {
+        if (!triggerElement || !menuRef.value) return;
+        styleRef.value = getMenuStyle(triggerElement, menuRef.value, options);
+      });
+    }
+
     function closeActionsMenu() {
       actionsMenuOpen.value = false;
+      actionsMenuStyle.value = {};
     }
 
     function closeCategoryFilter() {
       categoryFilterOpen.value = false;
+      categoryFilterMenuStyle.value = {};
     }
 
     function closeFloatMenu() {
-      floatMenu.value = { open: false, accountId: null, left: 0, top: 0 };
+      floatMenu.value = { open: false, accountId: null };
+      floatMenuStyle.value = {};
     }
 
     function closeAccountCategoryDialog() {
@@ -1718,17 +1774,38 @@ createApp({
       closeImportCategoryDropdown();
     }
 
-    function toggleCategoryFilter() {
-      categoryFilterOpen.value = !categoryFilterOpen.value;
+    function toggleCategoryFilter(event) {
+      if (categoryFilterOpen.value) {
+        closeCategoryFilter();
+        return;
+      }
       closeActionsMenu();
       closeFloatMenu();
+      closeImportCategoryDropdown();
+      categoryFilterOpen.value = true;
+      positionMenu(categoryFilterMenuStyle, event.currentTarget, categoryFilterMenuRef, {
+        matchTriggerWidth: true,
+        minWidth: 220,
+        maxWidth: 280,
+        preferredHeight: 240,
+      });
     }
 
-    function toggleActionsMenu() {
+    function toggleActionsMenu(event) {
       if (checkingAll.value) return;
-      actionsMenuOpen.value = !actionsMenuOpen.value;
+      if (actionsMenuOpen.value) {
+        closeActionsMenu();
+        return;
+      }
       closeCategoryFilter();
       closeFloatMenu();
+      closeImportCategoryDropdown();
+      actionsMenuOpen.value = true;
+      positionMenu(actionsMenuStyle, event.currentTarget, actionsMenuRef, {
+        align: 'right',
+        minWidth: 176,
+        preferredHeight: 220,
+      });
     }
 
     function toggleFloatMenu(accountId, event) {
@@ -1737,15 +1814,19 @@ createApp({
         closeFloatMenu();
         return;
       }
-      const rect = event.currentTarget.getBoundingClientRect();
+      closeActionsMenu();
+      closeCategoryFilter();
+      closeImportCategoryDropdown();
       floatMenu.value = {
         open: true,
         accountId,
-        left: Math.max(8, rect.right - 176),
-        top: rect.bottom + 6,
       };
-      closeActionsMenu();
-      closeCategoryFilter();
+      positionMenu(floatMenuStyle, event.currentTarget, floatMenuRef, {
+        align: 'right',
+        minWidth: 176,
+        preferredHeight: 160,
+        scrollable: false,
+      });
     }
 
     function openImportModal() {
@@ -1760,18 +1841,28 @@ createApp({
       importText.value = '';
       importCategoryMode.value = 'existing';
       importCategoryDropdownOpen.value = false;
+      importCategoryMenuStyle.value = {};
       importNewCategoryName.value = '';
     }
 
-    function toggleImportCategoryDropdown() {
-      importCategoryDropdownOpen.value = !importCategoryDropdownOpen.value;
+    function toggleImportCategoryDropdown(event) {
+      if (importCategoryDropdownOpen.value) {
+        closeImportCategoryDropdown();
+        return;
+      }
       closeActionsMenu();
       closeCategoryFilter();
       closeFloatMenu();
+      importCategoryDropdownOpen.value = true;
+      positionMenu(importCategoryMenuStyle, event.currentTarget, importCategoryMenuRef, {
+        matchTriggerWidth: true,
+        preferredHeight: 240,
+      });
     }
 
     function closeImportCategoryDropdown() {
       importCategoryDropdownOpen.value = false;
+      importCategoryMenuStyle.value = {};
     }
 
     function selectImportCategory(category) {
@@ -2573,7 +2664,15 @@ createApp({
       categoryManagerError,
       importInputRef,
       browserDataImportInputRef,
+      actionsMenuRef,
+      categoryFilterMenuRef,
+      importCategoryMenuRef,
+      floatMenuRef,
       toast,
+      actionsMenuStyle,
+      categoryFilterMenuStyle,
+      importCategoryMenuStyle,
+      floatMenuStyle,
       floatMenu,
       categories,
       dialogAccount,
