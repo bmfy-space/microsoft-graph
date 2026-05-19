@@ -454,7 +454,20 @@
     gap: 8px;
   }
 
+  .account-item.pinned {
+    border-color: #bfdbfe;
+    background: rgba(239, 246, 255, .82);
+  }
+
+  .account-email-row {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .account-email {
+    min-width: 0;
     color: var(--color-foreground);
     font-size: 13px;
     font-weight: 750;
@@ -462,6 +475,17 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .pin-badge {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: var(--color-primary-strong);
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 850;
+    flex: 0 0 auto;
   }
 
   .account-meta {
@@ -1218,10 +1242,13 @@
         <span>{{ categorySearchQuery.trim() ? 'Clear the email search or use the category dropdown to browse accounts.' : 'Choose other categories or import accounts into the selected categories.' }}</span>
       </div>
       <div v-else class="list">
-        <div v-for="account in filteredAccounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
+        <div v-for="account in filteredAccounts" :key="account.id" class="list-item account-item" :class="{ active: account.id === activeAccountId, pinned: isAccountPinned(account) }" role="button" tabindex="0" @click="selectAccount(account.id)" @keydown.enter.prevent="selectAccount(account.id)" @keydown.space.prevent="selectAccount(account.id)">
           <span class="account-avatar" :class="accountStatusClass(account)" aria-hidden="true">{{ accountInitial(account) }}</span>
           <span class="account-content">
-            <span class="account-email" :title="account.email">{{ account.email }}</span>
+            <span class="account-email-row">
+              <span class="account-email" :title="account.email">{{ account.email }}</span>
+              <span v-if="isAccountPinned(account)" class="pin-badge">PIN</span>
+            </span>
             <span class="account-meta">
               <span class="account-category-row">
                 <span class="category-pill-list" :title="accountCategoryLabel(account)">
@@ -1333,6 +1360,7 @@
     <div v-if="floatMenu.open" ref="floatMenuRef" class="menu float-menu" :style="floatMenuStyle" @click.stop>
       <button class="menu-item" type="button" @click="openAccountDetailDialog(floatMenu.accountId)">Details</button>
       <button class="menu-item" type="button" @click="openAccountCategoryDialog(floatMenu.accountId)">Categories</button>
+      <button class="menu-item" type="button" @click="toggleAccountPinned(floatMenu.accountId)">{{ isAccountPinned(floatMenuAccount) ? 'Unpin' : 'Pin' }}</button>
       <button class="menu-item" type="button" @click="copyAccount(floatMenu.accountId)">Copy</button>
       <button class="menu-item danger" type="button" @click="removeAccount(floatMenu.accountId)">Remove</button>
     </div>
@@ -1712,13 +1740,18 @@ createApp({
       return counts;
     });
     const dialogAccount = computed(() => accounts.value.find(account => account.id === dialogAccountId.value) || null);
+    const floatMenuAccount = computed(() => accounts.value.find(account => account.id === floatMenu.value.accountId) || null);
     const filteredAccounts = computed(() => {
       const query = categorySearchQuery.value.trim().toLowerCase();
+      let result;
       if (query) {
-        return accounts.value.filter(account => (account.email || '').toLowerCase().includes(query));
+        result = accounts.value.filter(account => (account.email || '').toLowerCase().includes(query));
+      } else if (!selectedCategories.value.length) {
+        result = accounts.value;
+      } else {
+        result = accounts.value.filter(account => selectedCategories.value.some(category => accountHasCategory(account, category)));
       }
-      if (!selectedCategories.value.length) return accounts.value;
-      return accounts.value.filter(account => selectedCategories.value.some(category => accountHasCategory(account, category)));
+      return sortAccountsForDisplay(result);
     });
     const activeAccount = computed(() => accounts.value.find(account => account.id === activeAccountId.value) || null);
     const activeEmails = computed(() => activeAccount.value?.emails || []);
@@ -1891,7 +1924,7 @@ createApp({
       positionMenu(floatMenuStyle, event.currentTarget, floatMenuRef, {
         align: 'right',
         minWidth: 176,
-        preferredHeight: 160,
+        preferredHeight: 200,
         scrollable: false,
       });
     }
@@ -2033,6 +2066,27 @@ createApp({
 
     function accountCategoryLabel(account) {
       return normalizeLegacyCategories(account).join(' · ');
+    }
+
+    function isAccountPinned(account) {
+      return Boolean(account?.pinned);
+    }
+
+    function sortAccountsForDisplay(list) {
+      return list.map((account, index) => ({ account, index })).sort((a, b) => {
+        const pinnedOrder = Number(isAccountPinned(b.account)) - Number(isAccountPinned(a.account));
+        if (pinnedOrder) return pinnedOrder;
+        return (a.account.seq ?? a.index) - (b.account.seq ?? b.index) || a.index - b.index;
+      }).map(item => item.account);
+    }
+
+    async function toggleAccountPinned(accountId) {
+      const account = accounts.value.find(item => item.id === accountId);
+      closeFloatMenu();
+      if (!account) return;
+      account.pinned = !isAccountPinned(account);
+      await dbPut('accounts', account);
+      showToast(`${account.email} ${account.pinned ? 'pinned' : 'unpinned'}`);
     }
 
     function openAccountCategoryDialog(accountId) {
@@ -2796,6 +2850,7 @@ createApp({
       floatMenu,
       categories,
       dialogAccount,
+      floatMenuAccount,
       filteredAccounts,
       activeAccount,
       activeEmails,
@@ -2831,6 +2886,8 @@ createApp({
       visibleAccountCategories,
       hiddenAccountCategoryCount,
       accountCategoryLabel,
+      isAccountPinned,
+      toggleAccountPinned,
       createManagedCategory,
       startRenameCategory,
       cancelRenameCategory,
