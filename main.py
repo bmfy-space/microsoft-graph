@@ -13,10 +13,11 @@ CORS(app)
 
 TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-SCOPE = "Mail.Read offline_access"
+TOKEN_SCOPES = ("Mail.Read", None)
 PAGE_SIZE = 20
 FOLDERS = ["inbox", "junkemail"]
 GRAPH_REQUEST_ERROR = "Graph API request failed. Please retry."
+TOKEN_REFRESH_ERROR = "Token refresh failed"
 
 EMAIL_FIELDS = (
     "id,internetMessageId,subject,bodyPreview,receivedDateTime,"
@@ -34,22 +35,55 @@ def parse_credentials(raw: str, separator: str = "----") -> dict[str, str]:
     }
 
 
-def get_access_token(client_id: str, refresh_token: str) -> str | None:
-    resp = requests.post(
-        TOKEN_URL,
-        data={
+def token_error_message(data: dict) -> str:
+    error = str(data.get("error") or "").strip()
+    description = str(data.get("error_description") or "").strip()
+    if error and description:
+        return f"{error}: {description}"
+    return error or description or TOKEN_REFRESH_ERROR
+
+
+def graph_error_message(resp: requests.Response) -> str:
+    try:
+        data = resp.json()
+    except ValueError:
+        return GRAPH_REQUEST_ERROR
+    error = data.get("error") if isinstance(data, dict) else None
+    if isinstance(error, dict):
+        code = str(error.get("code") or "").strip()
+        message = str(error.get("message") or "").strip()
+        if code and message:
+            return f"{code}: {message}"
+        return code or message or GRAPH_REQUEST_ERROR
+    return GRAPH_REQUEST_ERROR
+
+
+def get_access_token(client_id: str, refresh_token: str) -> tuple[str | None, str | None]:
+    last_error = TOKEN_REFRESH_ERROR
+    for scope in TOKEN_SCOPES:
+        form = {
             "client_id": client_id,
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
-            "scope": SCOPE,
-        },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        timeout=30,
-    )
-    data = resp.json()
-    if not resp.ok or "access_token" not in data:
-        return None
-    return data["access_token"]
+        }
+        if scope:
+            form["scope"] = scope
+
+        resp = requests.post(
+            TOKEN_URL,
+            data=form,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30,
+        )
+        try:
+            data = resp.json()
+        except ValueError:
+            last_error = TOKEN_REFRESH_ERROR
+            continue
+        if resp.ok and "access_token" in data:
+            return data["access_token"], None
+        last_error = token_error_message(data)
+    return None, last_error
 
 
 def _fetch_folder_page(
@@ -70,7 +104,8 @@ def _fetch_folder_page(
         "Accept": "application/json",
     }
     resp = requests.get(url, params=params, headers=headers, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise requests.HTTPError(graph_error_message(resp), response=resp)
     data = resp.json()
     return data.get("value", []), data.get("@odata.nextLink")
 
@@ -170,17 +205,17 @@ def api_email():
         return jsonify({"code": 400, "msg": "Invalid credentials format"}), 400
 
     try:
-        access_token = get_access_token(creds["client_id"], creds["refresh_token"])
+        access_token, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
     except requests.RequestException:
         return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
 
     if access_token is None:
-        return jsonify({"code": 401, "msg": "Failed to refresh token"}), 401
+        return jsonify({"code": 401, "msg": token_error or TOKEN_REFRESH_ERROR}), 401
 
     try:
         items = fetch_emails(access_token, page, page_size, folders)
-    except requests.RequestException:
-        return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
+    except requests.RequestException as exc:
+        return jsonify({"code": 502, "msg": str(exc) or GRAPH_REQUEST_ERROR}), 502
 
     return jsonify({
         "code": 200,
@@ -219,7 +254,7 @@ def api_check():
             continue
 
         try:
-            token = get_access_token(creds["client_id"], creds["refresh_token"])
+            token, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
         except requests.RequestException:
             results.append({"email": creds["email"], "valid": False, "error": GRAPH_REQUEST_ERROR})
             continue
@@ -227,7 +262,7 @@ def api_check():
         if token:
             results.append({"email": creds["email"], "valid": True})
         else:
-            results.append({"email": creds["email"], "valid": False, "error": "Token refresh failed"})
+            results.append({"email": creds["email"], "valid": False, "error": token_error or TOKEN_REFRESH_ERROR})
 
     return jsonify({"code": 200, "msg": "success", "data": results})
 
