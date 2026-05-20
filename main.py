@@ -13,7 +13,7 @@ CORS(app)
 
 TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-SCOPE = "https://graph.microsoft.com/.default"
+SCOPE = "Mail.Read offline_access"
 PAGE_SIZE = 20
 FOLDERS = ["inbox", "junkemail"]
 GRAPH_REQUEST_ERROR = "Graph API request failed. Please retry."
