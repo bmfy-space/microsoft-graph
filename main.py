@@ -300,14 +300,26 @@ def api_email():
         return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
 
     method = "graph"
+    emails = None
 
+    # 1. Graph API with scoped token
     if graph_token:
         try:
             items, _ = fetch_emails_page(graph_token, folder, page, page_size)
             emails = [build_email_json(item) for item in items]
-        except requests.RequestException as exc:
-            return jsonify({"code": 502, "msg": str(exc) or GRAPH_REQUEST_ERROR}), 502
-    elif opaque_token:
+        except requests.RequestException:
+            pass
+
+    # 2. Graph API with opaque token (works for some accounts without Mail.Read scope)
+    if emails is None and opaque_token:
+        try:
+            items, _ = fetch_emails_page(opaque_token, folder, page, page_size)
+            emails = [build_email_json(item) for item in items]
+        except requests.RequestException:
+            pass
+
+    # 3. IMAP fallback
+    if emails is None and opaque_token:
         method = "imap"
         try:
             mail = imap_connect(creds["email"], opaque_token)
@@ -315,9 +327,10 @@ def api_email():
                 emails = fetch_emails_imap(mail, folder, page, page_size)
             finally:
                 mail.logout()
-        except Exception as exc:
-            return jsonify({"code": 502, "msg": f"IMAP fallback failed: {exc}"}), 502
-    else:
+        except Exception:
+            pass
+
+    if emails is None:
         return jsonify({"code": 401, "msg": token_error or TOKEN_REFRESH_ERROR}), 401
 
     resp_data = {
@@ -369,14 +382,25 @@ def api_check():
             result["valid"] = True
             result["method"] = "graph"
         elif opaque_token:
+            # Try Graph API with opaque token
             try:
-                mail = imap_connect(creds["email"], opaque_token)
-                mail.logout()
-                result["valid"] = True
-                result["method"] = "imap"
+                headers = {"Authorization": f"Bearer {opaque_token}", "Accept": "application/json"}
+                resp = requests.get(f"{GRAPH_BASE}/me/messages?$top=1", headers=headers, timeout=15)
+                if resp.ok:
+                    result["valid"] = True
+                    result["method"] = "graph"
+                else:
+                    raise Exception("not ok")
             except Exception:
-                result["valid"] = False
-                result["error"] = "Graph and IMAP both failed"
+                # Fall back to IMAP
+                try:
+                    mail = imap_connect(creds["email"], opaque_token)
+                    mail.logout()
+                    result["valid"] = True
+                    result["method"] = "imap"
+                except Exception:
+                    result["valid"] = False
+                    result["error"] = "Graph and IMAP both failed"
         else:
             result["valid"] = False
             result["error"] = token_error or TOKEN_REFRESH_ERROR
