@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import email as email_parser
+import imaplib
+from email.header import decode_header
 
 import requests
 from flask import Flask, jsonify, request, send_from_directory
@@ -13,11 +15,12 @@ CORS(app)
 
 TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-TOKEN_SCOPES = ("Mail.Read", None)
 PAGE_SIZE = 20
 FOLDERS = ["inbox", "junkemail"]
 GRAPH_REQUEST_ERROR = "Graph API request failed. Please retry."
 TOKEN_REFRESH_ERROR = "Token refresh failed"
+IMAP_HOST = "outlook.office365.com"
+IMAP_FOLDER_MAP = {"inbox": "INBOX", "junkemail": "Junk Email"}
 
 EMAIL_FIELDS = (
     "id,internetMessageId,subject,bodyPreview,receivedDateTime,"
@@ -43,105 +46,192 @@ def token_error_message(data: dict) -> str:
     return error or description or TOKEN_REFRESH_ERROR
 
 
-def graph_error_message(resp: requests.Response) -> str:
+def _post_token(form: dict) -> tuple[dict | None, str | None]:
+    resp = requests.post(
+        TOKEN_URL,
+        data=form,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=30,
+    )
     try:
         data = resp.json()
     except ValueError:
-        return GRAPH_REQUEST_ERROR
-    error = data.get("error") if isinstance(data, dict) else None
-    if isinstance(error, dict):
-        code = str(error.get("code") or "").strip()
-        message = str(error.get("message") or "").strip()
-        if code and message:
-            return f"{code}: {message}"
-        return code or message or GRAPH_REQUEST_ERROR
-    return GRAPH_REQUEST_ERROR
+        return None, TOKEN_REFRESH_ERROR
+    if resp.ok and "access_token" in data:
+        return data, None
+    return None, token_error_message(data)
 
 
-def get_access_token(client_id: str, refresh_token: str) -> tuple[str | None, str | None]:
-    last_error = TOKEN_REFRESH_ERROR
-    for scope in TOKEN_SCOPES:
-        form = {
-            "client_id": client_id,
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-        }
-        if scope:
-            form["scope"] = scope
+def get_access_token(client_id: str, refresh_token: str) -> tuple[str | None, str | None, str | None, str | None]:
+    """Return (graph_token, opaque_token_for_imap, new_refresh_token, error)."""
+    base_form = {"client_id": client_id, "grant_type": "refresh_token", "refresh_token": refresh_token}
 
-        resp = requests.post(
-            TOKEN_URL,
-            data=form,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=30,
-        )
-        try:
-            data = resp.json()
-        except ValueError:
-            last_error = TOKEN_REFRESH_ERROR
-            continue
-        if resp.ok and "access_token" in data:
-            return data["access_token"], None
-        last_error = token_error_message(data)
-    return None, last_error
+    # Try with Mail.Read scope directly
+    form = {**base_form, "scope": "Mail.Read"}
+    data, err = _post_token(form)
+    if data:
+        return data["access_token"], None, data.get("refresh_token"), None
+
+    # Scope failed — refresh without scope to get opaque token + new refresh_token
+    data, err2 = _post_token(base_form)
+    opaque_token = data.get("access_token") if data else None
+    new_rt = data.get("refresh_token") if data else None
+    working_rt = new_rt or refresh_token
+
+    # Retry with scope using the new refresh_token
+    form = {"client_id": client_id, "grant_type": "refresh_token", "refresh_token": working_rt, "scope": "Mail.Read"}
+    data, err3 = _post_token(form)
+    if data:
+        return data["access_token"], None, new_rt or data.get("refresh_token"), None
+
+    # Graph API failed — return opaque token for IMAP fallback
+    return None, opaque_token, new_rt, err3 or err
 
 
-def _fetch_folder_page(
-    access_token: str, folder: str, page_size: int, url: str | None = None
+def fetch_emails_page(
+    access_token: str,
+    folder: str,
+    page: int = 1,
+    page_size: int = PAGE_SIZE,
 ) -> tuple[list[dict], str | None]:
-    if url is None:
-        url = f"{GRAPH_BASE}/me/mailFolders/{folder}/messages"
-        params = {
-            "$orderby": "receivedDateTime DESC",
-            "$select": EMAIL_FIELDS,
-            "$top": page_size,
-        }
-    else:
-        params = None
-
+    url = f"{GRAPH_BASE}/me/mailFolders/{folder}/messages"
+    params = {
+        "$orderby": "receivedDateTime DESC",
+        "$select": EMAIL_FIELDS,
+        "$top": page_size,
+        "$skip": (page - 1) * page_size,
+    }
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
     resp = requests.get(url, params=params, headers=headers, timeout=30)
     if not resp.ok:
-        raise requests.HTTPError(graph_error_message(resp), response=resp)
+        raise requests.HTTPError(
+            resp.json().get("error", {}).get("message", GRAPH_REQUEST_ERROR),
+            response=resp,
+        )
     data = resp.json()
     return data.get("value", []), data.get("@odata.nextLink")
 
 
-def fetch_emails(
-    access_token: str,
+def imap_connect(email: str, access_token: str) -> imaplib.IMAP4_SSL:
+    auth_string = f"user={email}\x01auth=Bearer {access_token}\x01\x01"
+    mail = imaplib.IMAP4_SSL(IMAP_HOST)
+    mail.authenticate("XOAUTH2", lambda x: auth_string.encode())
+    return mail
+
+
+def _decode_header_value(raw: str | None) -> str:
+    if not raw:
+        return ""
+    parts = decode_header(raw)
+    decoded = []
+    for data, charset in parts:
+        if isinstance(data, bytes):
+            decoded.append(data.decode(charset or "utf-8", errors="replace"))
+        else:
+            decoded.append(data)
+    return "".join(decoded).strip()
+
+
+def _extract_body(msg) -> dict:
+    body_text = ""
+    body_html = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            text = payload.decode(charset, errors="replace")
+            if ct == "text/plain":
+                body_text = body_text or text
+            elif ct == "text/html":
+                body_html = body_html or text
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload:
+            charset = msg.get_content_charset() or "utf-8"
+            text = payload.decode(charset, errors="replace")
+            if msg.get_content_type() == "text/html":
+                body_html = text
+            else:
+                body_text = text
+    if body_html:
+        return {"contentType": "html", "content": body_html}
+    return {"contentType": "text", "content": body_text}
+
+
+def parse_imap_message(msg_id: bytes, raw: bytes) -> dict:
+    msg = email_parser.message_from_bytes(raw)
+    from_hdr = msg.get("From", "")
+    name, addr = email_parser.utils.parseaddr(from_hdr)
+    if not name:
+        name = _decode_header_value(from_hdr)
+
+    to_list = []
+    for val in (msg.get_all("To") or []):
+        for part in val.split(","):
+            n, a = email_parser.utils.parseaddr(part.strip())
+            if n and a:
+                to_list.append(f"{n} <{a}>")
+            else:
+                to_list.append(n or a)
+
+    cc_list = []
+    for val in (msg.get_all("Cc") or []):
+        for part in val.split(","):
+            n, a = email_parser.utils.parseaddr(part.strip())
+            if n and a:
+                cc_list.append(f"{n} <{a}>")
+            else:
+                cc_list.append(n or a)
+
+    body = _extract_body(msg)
+    preview = body["content"][:256].replace("\r\n", " ").replace("\n", " ") if body["content"] else ""
+
+    return {
+        "id": msg_id.decode(),
+        "internetMessageId": msg.get("Message-ID", ""),
+        "subject": _decode_header_value(msg.get("Subject")) or "(No subject)",
+        "from": {"name": name, "address": addr},
+        "to": to_list,
+        "cc": cc_list,
+        "date": msg.get("Date", ""),
+        "preview": preview,
+        "body": body,
+    }
+
+
+def fetch_emails_imap(
+    mail: imaplib.IMAP4_SSL,
+    folder: str,
     page: int = 1,
     page_size: int = PAGE_SIZE,
-    folders: list[str] | None = None,
 ) -> list[dict]:
-    target_count = page * page_size + 1
-    merged: dict[str, dict] = {}
+    imap_folder = IMAP_FOLDER_MAP.get(folder, folder)
+    mail.select(imap_folder, readonly=True)
 
-    for folder in (folders or FOLDERS):
-        next_link = None
-        fetched = 0
-        while True:
-            items, next_link = _fetch_folder_page(
-                access_token, folder, page_size, url=next_link
-            )
-            for item in items:
-                uid = item.get("id")
-                if uid and uid not in merged:
-                    merged[uid] = item
-            fetched += len(items)
-            if not next_link or fetched >= target_count:
-                break
+    status, data = mail.search(None, "ALL")
+    if status != "OK" or not data[0]:
+        return []
 
-    all_items = sorted(
-        merged.values(),
-        key=lambda x: x.get("receivedDateTime") or "",
-        reverse=True,
-    )
+    msg_ids = data[0].split()
+    msg_ids.reverse()  # newest first
 
     start = (page - 1) * page_size
-    return all_items[start : start + page_size]
+    page_ids = msg_ids[start : start + page_size]
+
+    results = []
+    for mid in page_ids:
+        status, msg_data = mail.fetch(mid, "(RFC822)")
+        if status != "OK":
+            continue
+        raw = msg_data[0][1]
+        results.append(parse_imap_message(mid, raw))
+    return results
 
 
 def format_recipients(recipients: list[dict] | None) -> list[str]:
@@ -197,7 +287,7 @@ def api_email():
     separator = data.get("separator", "----")
     page = int(data.get("page", 1))
     page_size = int(data.get("pageSize", PAGE_SIZE))
-    folders = data.get("folders")
+    folder = data.get("folder", "inbox")
 
     try:
         creds = parse_credentials(credentials, separator)
@@ -205,29 +295,44 @@ def api_email():
         return jsonify({"code": 400, "msg": "Invalid credentials format"}), 400
 
     try:
-        access_token, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
+        graph_token, opaque_token, new_rt, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
     except requests.RequestException:
         return jsonify({"code": 502, "msg": GRAPH_REQUEST_ERROR}), 502
 
-    if access_token is None:
+    method = "graph"
+
+    if graph_token:
+        try:
+            items, _ = fetch_emails_page(graph_token, folder, page, page_size)
+            emails = [build_email_json(item) for item in items]
+        except requests.RequestException as exc:
+            return jsonify({"code": 502, "msg": str(exc) or GRAPH_REQUEST_ERROR}), 502
+    elif opaque_token:
+        method = "imap"
+        try:
+            mail = imap_connect(creds["email"], opaque_token)
+            try:
+                emails = fetch_emails_imap(mail, folder, page, page_size)
+            finally:
+                mail.logout()
+        except Exception as exc:
+            return jsonify({"code": 502, "msg": f"IMAP fallback failed: {exc}"}), 502
+    else:
         return jsonify({"code": 401, "msg": token_error or TOKEN_REFRESH_ERROR}), 401
 
-    try:
-        items = fetch_emails(access_token, page, page_size, folders)
-    except requests.RequestException as exc:
-        return jsonify({"code": 502, "msg": str(exc) or GRAPH_REQUEST_ERROR}), 502
+    resp_data = {
+        "account": creds["email"],
+        "folder": folder,
+        "page": page,
+        "pageSize": page_size,
+        "total": len(emails),
+        "method": method,
+        "emails": emails,
+    }
+    if new_rt:
+        resp_data["new_refresh_token"] = new_rt
 
-    return jsonify({
-        "code": 200,
-        "msg": "success",
-        "data": {
-            "account": creds["email"],
-            "page": page,
-            "pageSize": page_size,
-            "total": len(items),
-            "emails": [build_email_json(item) for item in items],
-        },
-    })
+    return jsonify({"code": 200, "msg": "success", "data": resp_data})
 
 
 @app.route("/api/check", methods=["POST"])
@@ -254,15 +359,30 @@ def api_check():
             continue
 
         try:
-            token, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
+            graph_token, opaque_token, new_rt, token_error = get_access_token(creds["client_id"], creds["refresh_token"])
         except requests.RequestException:
             results.append({"email": creds["email"], "valid": False, "error": GRAPH_REQUEST_ERROR})
             continue
 
-        if token:
-            results.append({"email": creds["email"], "valid": True})
+        result = {"email": creds["email"]}
+        if graph_token:
+            result["valid"] = True
+            result["method"] = "graph"
+        elif opaque_token:
+            try:
+                mail = imap_connect(creds["email"], opaque_token)
+                mail.logout()
+                result["valid"] = True
+                result["method"] = "imap"
+            except Exception:
+                result["valid"] = False
+                result["error"] = "Graph and IMAP both failed"
         else:
-            results.append({"email": creds["email"], "valid": False, "error": token_error or TOKEN_REFRESH_ERROR})
+            result["valid"] = False
+            result["error"] = token_error or TOKEN_REFRESH_ERROR
+        if new_rt:
+            result["new_refresh_token"] = new_rt
+        results.append(result)
 
     return jsonify({"code": 200, "msg": "success", "data": results})
 

@@ -1776,7 +1776,10 @@ createApp({
     const emailsTitle = computed(() => {
       if (initialEmailLoading.value) return 'Loading';
       if (!activeAccount.value) return 'Emails';
-      return `Emails (${activeEmails.value.length || activeAccount.value.emailCount || 0})`;
+      const count = activeEmails.value.length || activeAccount.value.emailCount || 0;
+      const method = activeAccount.value.method;
+      const label = method === 'imap' ? 'IMAP' : method === 'graph' ? 'Graph' : '';
+      return label ? `Emails (${count}) · ${label}` : `Emails (${count})`;
     });
 
     function showToast(message) {
@@ -2641,6 +2644,7 @@ createApp({
         account.emails = data.data.emails || [];
         account.status = 'ok';
         account.emailCount = data.data.total;
+        account.method = data.data.method || '';
         await dbPut('accounts', account);
         await dbPut('emails', { accountId: account.id, emails: account.emails });
       } catch (error) {
@@ -2686,6 +2690,7 @@ createApp({
       if (account.checkStatus === 'valid') return 'Verified';
       if (account.checkStatus === 'invalid') return account.checkError || 'Needs attention';
       if (account.checkStatus === 'checking') return 'Verifying';
+      if (account.status === 'ok' && account.method) return account.method === 'imap' ? 'IMAP' : 'Graph API';
       if (account.status === 'ok') return 'Cache ready';
       if (account.status === 'err') return 'Request failed';
       if (account.status === 'loading') return 'Loading mailbox';
